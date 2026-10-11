@@ -2,7 +2,7 @@
 
 **Deposit addresses that fund any Arc contract on arrival.** A sender presses Send in any wallet, withdraws from an exchange, or bridges with CCTP. Doorstep deposits the USDC into the contract you chose, credited to the person you chose, or sends it back if that isn't possible.
 
-Live on Arc mainnet: _DOORSTEP_ADDRESS_ · Demo escrow: _ESCROW_ADDRESS_ · App: _APP_URL_
+Live on Arc mainnet (chain 5042): Doorstep [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080) · Demo escrow [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3)
 
 ## The problem
 
@@ -72,6 +72,7 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | `test/Doorstep.t.sol` | Tests run under Arc semantics with Arc Foundry |
 | `test/ArcGenesis.sol` | Arc's USDC and system contracts, generated from `circlefin/arc-node` genesis, etched only if missing |
 | `script/Deploy.s.sol` | Deploys to Arc mainnet or testnet; refuses other chains |
+| `scripts/demo-mainnet.sh` | Live mainnet demo with `arc-cast` and a keystore: problem, two landings at one address, a bounce, a withdrawal |
 | `keeper/keeper.mjs` | Permissionless keeper: discovers `Announced` intents from logs (in spans under the RPC's 10,000-block cap), lands deposits |
 | `keeper/e2e.mjs` | End-to-end rehearsal with real transactions (local node or testnet) |
 | `keeper/feecheck.mjs` | Keeper fee versus actual gas cost for every landing |
@@ -87,6 +88,8 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | Keeper discovers an announced intent from logs and lands a deposit unattended | `keeper/keeper.mjs` | landed |
 | Web app: create address, QR, live status, landed state, mobile layout | headless Chromium against the local node | works |
 | Page and contract compute the same deposit address | `test_addressMatchesViemVector` | equal |
+| The same 25 tests against live Arc mainnet state | `arc-forge test --fork-url https://rpc.mainnet.arc.io` | all pass |
+| Live run on Arc mainnet: deploy, native send lands, ERC-20 transfer to the same address lands, expired intent bounces | `scripts/demo-mainnet.sh` | all pass, see [Mainnet proof](#mainnet-proof) |
 
 Arc's USDC system contracts used in the tests are generated from `circlefin/arc-node`'s genesis. The USDC proxy and implementation bytecode are identical in the localdev and mainnet genesis files.
 
@@ -120,6 +123,12 @@ arc-cast wallet import doorstep-deployer --interactive
 FOUNDRY_PROFILE=arc arc-forge script script/Deploy.s.sol --rpc-url arc --account doorstep-deployer --broadcast
 ```
 
+Live demo on mainnet (about 0.13 USDC moves through Doorstep and comes back, minus gas):
+
+```shell
+bash scripts/demo-mainnet.sh      # asks for the keystore password once
+```
+
 Keeper:
 
 ```shell
@@ -137,7 +146,25 @@ Put the deployed addresses and deploy block in `web/dist/config.js` (or `web/con
 
 ## Mainnet proof
 
-_Filled in after the mainnet runs: transaction links for a native send, an ERC-20 transfer, an exchange withdrawal and a bounce._
+Deployed and exercised on Arc mainnet on 2026-10-11 (UTC) with `scripts/demo-mainnet.sh`, which uses only `arc-cast` and a local encrypted keystore. The script checks every receipt's status and the Doorstep event it emitted, and stops at the first mismatch. All steps passed.
+
+| Step | What happened | Transaction |
+| --- | --- | --- |
+| Deploy | `Doorstep`, block 25488972, 1,257,811 gas | [`0x26ed6f67…`](https://explorer.arc.io/tx/0x26ed6f676fa6b86140ce919376ca7086148d4a734a8bf94be6b9fd2e39dd3836) |
+| Deploy | `DemoEscrow`, block 25488973, 367,095 gas | [`0x4ac68483…`](https://explorer.arc.io/tx/0x4ac68483dac76c69cba4345049f845b217315b46c4f3c14d518fa8d205583509) |
+| The problem | A plain wallet send of USDC straight to `DemoEscrow` reverts (`eth_estimateGas`) | n/a |
+| Announce | Intent: deposit into `DemoEscrow` for the wallet, refunds to the wallet. Deposit address [`0xEB95f51A…1788a`](https://explorer.arc.io/address/0xEB95f51A3A2c2A931983FDB10939cfb102E1788a) | [`0x7ce28911…`](https://explorer.arc.io/tx/0x7ce28911df29ac79f78219c41d13abe3f8d8e941a2da7362e7feac5d1eb04d83) |
+| Pay (native send) | 0.05 USDC sent to the deposit address like any wallet transfer | [`0x460b05a5…`](https://explorer.arc.io/tx/0x460b05a5def97439d547fb83f3f208e40a7019b7d19a12a2e90033d416484b5d) |
+| Land → **Landed** | Escrow credits the beneficiary 0.045120 USDC; the rest repaid the keeper's gas | [`0x23b0e41b…`](https://explorer.arc.io/tx/0x23b0e41b0126ed54411a6bb07f45ccf94546cbd635d1a7df9b735bee1ec22243) |
+| Pay (ERC-20 transfer) | 0.05 USDC via `USDC.transfer` to the **same address**, in a later transaction | [`0x31787653…`](https://explorer.arc.io/tx/0x3178765375904149480680978b0cfb9e77b2bb2435a65a667028eefce929fc44) |
+| Land → **Landed** | Address reused; escrow credit 0.045120 → 0.090240 USDC | [`0xa261e1c5…`](https://explorer.arc.io/tx/0xa261e1c5226b3eecaf4ae2bf1d733973db86fb4fe8028fb63d03a1a7de753441) |
+| Pay (expiring intent) | 0.03 USDC to a second intent's address [`0xA1C14A06…2159e`](https://explorer.arc.io/address/0xA1C14A0643425e69aB9435a5B51c90f369A2159e), which expires 45 s later | [`0xb4ac04a7…`](https://explorer.arc.io/tx/0xb4ac04a74ee8412cdef28107168a122b7cf49aac3e86ec3557bec757273f7fd5) |
+| Land → **Bounced** | Expired, so the deposit is refunded to `refundTo` and the escrow credit is unchanged | [`0x479da99c…`](https://explorer.arc.io/tx/0x479da99ca21d995bbe90461077962622bf8000bc411f19737d6181970fbcfbe0) |
+| Withdraw | The beneficiary withdraws 0.090240 USDC from the escrow | [`0xd891ae24…`](https://explorer.arc.io/tx/0xd891ae24d31c10cc18193e01219fa61a4d4164c4d6ab573669dbe0586954a4f7) |
+
+After the run, Doorstep's balance is exactly 0. In this demo one wallet played payer, keeper and beneficiary, so the keeper fee (about 0.0049 USDC per landing, gas at Arc's 20 Gwei floor) went back to the same wallet. The whole run, deploy included, cost about 0.045 USDC in gas.
+
+Still to show: an exchange withdrawal straight to a deposit address. It lands the same way as the native send above, because an exchange withdrawal on Arc is a native transfer.
 
 ## License
 
