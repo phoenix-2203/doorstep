@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+libs = ["lib"]
+solc = "0.8.30"
+evm_version = "prague"
+optimizer = true
+optimizer_runs = 10000
+bytecode_hash = "none"
+remappings = ["forge-std/=lib/forge-std/src/"]
+
+[profile.arc]
+network = "arc"
+# Arc mainnet has run Zero8 since timestamp 1789052400 (circlefin/arc-node hardforks.rs).
+hardfork = "arc:zero8"
+
+[rpc_endpoints]
+arc = "https://rpc.mainnet.arc.io"
+arc_testnet = "https://rpc.testnet.arc.io"

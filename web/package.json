@@ -1,0 +1,15 @@
+{
+  "name": "doorstep-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild app.js --bundle --format=esm --target=es2022 --minify --external:./config.js --outfile=dist/app.js && cp index.html config.js abi.json dist/"
+  },
+  "dependencies": {
+    "qrcode-generator": "1.4.4",
+    "viem": "2.57.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}
