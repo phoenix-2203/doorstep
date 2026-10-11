@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doorstep</title>
+<meta name="description" content="Deposit addresses that fund any Arc contract on arrival, from any wallet, exchange or bridge.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #EDF0F2;
+  --paper-2: #E2E7EB;
+  --ink: #1B2230;
+  --ink-2: #4A5465;
+  --door: #2C5A86;
+  --door-deep: #23496D;
+  --brass: #B07F2E;
+  --landed: #2F7A57;
+  --bounced: #A9442F;
+  --line: #C9D1D8;
+  --white: #FFFFFF;
+  --focus: #2C5A86;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151A22; --paper-2: #1C232D; --ink: #E7EBEF; --ink-2: #A8B2BF;
+    --door: #3E73A6; --door-deep: #2D5A84; --line: #2E3744; --white: #0F141B; --focus: #8DB6DE;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.55 "Instrument Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.brand { font: 700 28px/1 "Bricolage Grotesque", sans-serif; letter-spacing: -0.02em; margin: 0; }
+.brand a { color: inherit; text-decoration: none; }
+.net { font-size: 14px; color: var(--ink-2); }
+.net b { color: var(--ink); font-weight: 600; }
+.lede { font: 500 clamp(26px, 4vw, 40px)/1.12 "Bricolage Grotesque", sans-serif; letter-spacing: -0.02em; max-width: 22ch; margin: 40px 0 12px; }
+.sub { color: var(--ink-2); max-width: 60ch; margin: 0 0 36px; }
+
+.stage { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 48px; align-items: start; }
+@media (max-width: 820px) { .stage { grid-template-columns: 1fr; gap: 32px; } }
+
+/* The door: the one bold element on the page. */
+.door {
+  position: relative;
+  background: var(--door);
+  color: #fff;
+  border-radius: 190px 190px 14px 14px;
+  padding: 72px 28px 28px;
+  min-height: 560px;
+  display: flex; flex-direction: column; align-items: center;
+  box-shadow: inset 0 0 0 10px var(--door-deep);
+}
+.light { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,.85); white-space: nowrap; }
+.bulb { width: 12px; height: 12px; border-radius: 50%; background: #6E7A88; box-shadow: none; transition: background .4s, box-shadow .4s; }
+.door[data-state="arrived"] .bulb { background: var(--brass); box-shadow: 0 0 0 4px rgba(176,127,46,.3), 0 0 18px 4px rgba(214,166,77,.55); }
+.door[data-state="landed"] .bulb { background: #5BC48F; box-shadow: 0 0 0 4px rgba(91,196,143,.25), 0 0 18px 4px rgba(91,196,143,.5); }
+.door[data-state="bounced"] .bulb { background: #E07A60; box-shadow: 0 0 0 4px rgba(224,122,96,.25), 0 0 18px 4px rgba(224,122,96,.5); }
+@media (prefers-reduced-motion: reduce) { .bulb { transition: none; } }
+.qr { background: #fff; border-radius: 10px; padding: 12px; width: 220px; height: 220px; display: grid; place-items: center; margin-top: 14px; }
+.qr svg, .qr img { width: 100%; height: 100%; }
+.qr .empty { color: #6E7A88; font-size: 14px; text-align: center; padding: 0 12px; }
+.slot { margin-top: 26px; width: 100%; background: var(--door-deep); border-radius: 8px; padding: 12px 14px; }
+.slot .k { font-size: 12px; color: rgba(255,255,255,.7); }
+.addr { font: 400 13px/1.45 "JetBrains Mono", ui-monospace, monospace; word-break: break-all; color: #fff; }
+.knob { position: absolute; right: 26px; top: 58%; width: 16px; height: 16px; border-radius: 50%; background: var(--brass); box-shadow: inset -2px -2px 0 rgba(0,0,0,.2); }
+.door .amount { margin-top: 18px; font: 700 34px/1 "Bricolage Grotesque", sans-serif; letter-spacing: -0.01em; }
+.door .amount small { font: 500 14px "Instrument Sans", sans-serif; opacity: .8; margin-left: 4px; }
+.door .say { margin-top: 6px; font-size: 14px; color: rgba(255,255,255,.85); text-align: center; max-width: 30ch; }
+
+/* Right column: quiet. */
+h2 { font: 600 20px/1.2 "Bricolage Grotesque", sans-serif; letter-spacing: -0.01em; margin: 0 0 14px; }
+form { display: grid; gap: 14px; }
+label { display: grid; gap: 6px; font-size: 14px; font-weight: 500; }
+.hint { font-weight: 400; color: var(--ink-2); font-size: 13px; }
+input, select {
+  font: inherit; color: var(--ink); background: var(--white);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%;
+}
+input.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+button {
+  font: 600 15px "Instrument Sans", sans-serif; border-radius: 8px; padding: 11px 16px; cursor: pointer;
+  border: 1px solid var(--door); background: var(--door); color: #fff;
+}
+button.quiet { background: transparent; color: var(--door); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.facts { border-top: 1px solid var(--line); margin: 0; }
+.facts div { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 520px) { .facts div { grid-template-columns: 1fr; gap: 2px; } }
+.facts dt { color: var(--ink-2); font-size: 14px; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts .mono { font: 400 13px "JetBrains Mono", ui-monospace, monospace; }
+.log { list-style: none; padding: 0; margin: 8px 0 0; }
+.log li { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.log .ok { color: var(--landed); font-weight: 600; }
+.log .no { color: var(--bounced); font-weight: 600; }
+a { color: var(--door); }
+.note { font-size: 14px; color: var(--ink-2); margin-top: 18px; }
+.msg { min-height: 1.5em; font-size: 14px; margin-top: 10px; }
+.msg.err { color: var(--bounced); }
+section + section { margin-top: 36px; }
+footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <p class="brand"><a href="./">Doorstep</a></p>
+    <span class="net" id="net">Arc</span>
+  </header>
+
+  <!-- Create view -->
+  <div id="create-view">
+    <p class="lede">Get paid into a contract from any wallet, exchange or bridge.</p>
+    <p class="sub">Doorstep gives you an address. Whatever USDC lands there is deposited into the contract you choose, credited to the person you choose, or sent back if it can't be. The sender just presses Send.</p>
+    <div class="stage">
+      <div class="door" id="door-create" data-state="idle" aria-live="polite">
+        <span class="light"><span class="bulb"></span><span>Fill in the form to get an address</span></span>
+        <div class="qr"><span class="empty">The address appears here</span></div>
+        <div class="knob" aria-hidden="true"></div>
+      </div>
+      <section>
+        <h2>Where should arriving USDC go?</h2>
+        <form id="intent-form">
+          <label>Contract to fund
+            <span class="hint">Defaults to the demo escrow. It must pull funds with transferFrom.</span>
+            <input class="mono" name="target" required pattern="^0x[0-9a-fA-F]{40}$">
+          </label>
+          <label>Credit this address
+            <span class="hint">Who the escrow credits for each deposit.</span>
+            <input class="mono" name="beneficiary" required pattern="^0x[0-9a-fA-F]{40}$">
+          </label>
+          <label>Refund to
+            <span class="hint">Your own wallet. Never an exchange deposit address: refunds sent there can be lost.</span>
+            <input class="mono" name="refundTo" required pattern="^0x[0-9a-fA-F]{40}$">
+          </label>
+          <div class="row">
+            <label>Minimum deposit (USDC)
+              <input name="min" type="number" step="0.000001" min="0" value="0.05" required>
+            </label>
+            <label>Keeper fee cap (USDC)
+              <input name="fee" type="number" step="0.000001" min="0" value="0.01" required>
+            </label>
+          </div>
+          <div class="row">
+            <label>Expires
+              <select name="expiry">
+                <option value="3600">In 1 hour</option>
+                <option value="86400" selected>In 1 day</option>
+                <option value="604800">In 7 days</option>
+                <option value="2592000">In 30 days</option>
+              </select>
+            </label>
+            <label>Reference
+              <span class="hint">Order or invoice id, up to 31 characters.</span>
+              <input name="ref" maxlength="31" value="order-1">
+            </label>
+          </div>
+          <div class="actions"><button type="submit">Create address</button></div>
+          <p class="msg" id="create-msg" role="status"></p>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- Pay / status view -->
+  <div id="pay-view" hidden>
+    <p class="lede" id="pay-lede">Send USDC on Arc to this address.</p>
+    <p class="sub">Use any wallet's Send button or an exchange withdrawal on the Arc network. It is credited within seconds once a keeper lands it.</p>
+    <div class="stage">
+      <div class="door" id="door" data-state="idle" aria-live="polite">
+        <span class="light"><span class="bulb"></span><span id="light-text">Waiting for a deposit</span></span>
+        <div class="qr" id="qr"></div>
+        <div class="amount" id="amount">0<small>USDC waiting</small></div>
+        <div class="slot"><div class="k">Deposit address on Arc</div><div class="addr" id="addr"></div></div>
+        <div class="say" id="say">Only send USDC on the Arc network.</div>
+        <div class="knob" aria-hidden="true"></div>
+      </div>
+      <div>
+        <section>
+          <h2>What this address does</h2>
+          <dl class="facts" id="facts"></dl>
+          <p class="note">This page recomputes the address from these terms itself. If any term changed, the address would change too.</p>
+        </section>
+        <section>
+          <h2>Actions</h2>
+          <div class="actions">
+            <button id="btn-pay" type="button">Send from my wallet</button>
+            <button id="btn-land" class="quiet" type="button">Land it now</button>
+            <button id="btn-announce" class="quiet" type="button">Announce to keepers</button>
+            <button id="btn-copy" class="quiet" type="button">Copy link</button>
+          </div>
+          <p class="msg" id="pay-msg" role="status"></p>
+        </section>
+        <section>
+          <h2>History</h2>
+          <ul class="log" id="log"><li>No landings yet.</li></ul>
+        </section>
+        <section id="escrow-box" hidden>
+          <h2>Demo escrow</h2>
+          <dl class="facts"><div><dt>Credited to beneficiary</dt><dd id="credited">0 USDC</dd></div></dl>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <footer>Doorstep is unaudited. Use small amounts. Source and tests: <a id="repo-link" href="#">repository</a>.</footer>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
