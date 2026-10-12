@@ -2,7 +2,8 @@ out/
 cache/
 broadcast/*/31337/
 keeper/node_modules/
-keeper/keeper-state.json
+keeper/keeper-state*.json
+keeper/.env
 .env
 web/node_modules/
 broadcast/*/dry-run/

@@ -39,7 +39,8 @@ const DOORSTEP = process.env.DOORSTEP;
 const FROM_BLOCK = BigInt(process.env.FROM_BLOCK ?? '0');
 const POLL_MS = Number(process.env.POLL_MS ?? 2000);
 const LOG_SPAN = BigInt(process.env.LOG_SPAN ?? 9000); // blocks per eth_getLogs call; Arc's public RPC caps ranges at 10,000
-const STATE_FILE = process.env.STATE_FILE ?? new URL('./keeper-state.json', import.meta.url).pathname;
+// One state file per Doorstep contract, so switching DOORSTEP never mixes up registered addresses.
+const STATE_FILE = process.env.STATE_FILE ?? new URL(`./keeper-state-${(process.env.DOORSTEP ?? '').slice(2, 10).toLowerCase()}.json`, import.meta.url).pathname;
 const MIN_FEE = parseGwei('20'); // Arc mempool floor; lower maxFeePerGas is silently dropped
 
 if (!DOORSTEP) throw new Error('Set DOORSTEP to the deployed Doorstep address');
