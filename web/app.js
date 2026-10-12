@@ -32,6 +32,10 @@ const clientFor = (doorstep, fromBlock) => createDoorstep({
   chainId, rpcUrl: net.rpcUrl, explorer: net.explorer, doorstep, fromBlock: fromBlock ?? BigInt(CONFIG.deployBlock),
 });
 
+const ESCROW_ABI = [
+  { type: 'function', name: 'balanceOf6', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'withdraw', stateMutability: 'nonpayable', inputs: [{ type: 'uint256', name: 'amount6' }, { type: 'address', name: 'to' }], outputs: [] },
+];
 const $ = (id) => document.getElementById(id);
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const chainName = chainId === 5042 ? 'Arc' : chainId === 5042002 ? 'Arc Testnet' : 'Local Arc node';
@@ -205,9 +209,36 @@ async function initPay(fragment) {
         : `<li><span class="no">${e.reasonText === 'cancelled' ? 'Cancelled' : 'Refunded'}</span> ${formatUsdc18(e.refunded)} USDC back to ${short(e.refundTo)}${e.reasonText === 'cancelled' ? '' : ` (${e.reasonText})`}${e.keeperFee > 0n ? `. Delivery fee ${formatUsdc18(e.keeperFee)} USDC` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`)).join('')
       : '<li>Nothing delivered or refunded yet.</li>';
     if (isEscrow && ex.beneficiary) {
-      const c = await ds.publicClient.readContract({ address: ESCROW, abi: [{ type: 'function', name: 'balanceOf6', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] }], functionName: 'balanceOf6', args: [ex.beneficiary] });
-      $('credited').textContent = `${formatUsdc6(c)} USDC`;
+      held = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [ex.beneficiary] });
+      $('credited').textContent = `${formatUsdc6(held)} USDC`;
+      $('btn-withdraw').disabled = held === 0n;
     }
+  }
+
+  // Demo escrow: the credited wallet takes its balance out to itself.
+  let held = 0n;
+  if (isEscrow && ex.beneficiary) {
+    $('escrow-owner').textContent = ex.beneficiary;
+    const wsay = (t, err) => { $('withdraw-msg').className = err ? 'msg err' : 'msg'; $('withdraw-msg').innerHTML = t; };
+    $('btn-withdraw').onclick = async () => {
+      try {
+        const w = await connect(ds);
+        if (w.account.address !== ex.beneficiary) {
+          throw new Error(`Only ${short(ex.beneficiary)} can withdraw this. Your wallet is connected as ${short(w.account.address)}: switch to the credited account in your wallet and try again.`);
+        }
+        const amount = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [ex.beneficiary] });
+        if (amount === 0n) throw new Error('Nothing to withdraw.');
+        wsay(`Withdrawing ${formatUsdc6(amount)} USDC… confirm in your wallet.`);
+        const hash = await w.writeContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'withdraw', args: [amount, w.account.address] });
+        wsay(`Sent, waiting for confirmation… ${link('tx/' + hash, 'View transaction')}`);
+        const r = await ds.publicClient.waitForTransactionReceipt({ hash });
+        if (r.status !== 'success') throw new Error('The withdrawal failed.');
+        wsay(`Done. ${formatUsdc6(amount)} USDC is now in your wallet. ${link('tx/' + hash, 'View transaction')}`);
+        refresh();
+      } catch (e) {
+        wsay(esc(e.shortMessage ?? e.message), true);
+      }
+    };
   }
 
   const say = (t, err) => { $('pay-msg').className = err ? 'msg err' : 'msg'; $('pay-msg').textContent = t; };
