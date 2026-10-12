@@ -147,6 +147,9 @@ function noteRecovered() {
 }
 
 let lastProgress = 0;
+let lastHead = 0n;
+let lastHeartbeat = 0;
+let announcedWatching = false;
 async function scan() {
   let head;
   try {
@@ -199,8 +202,16 @@ async function scan() {
     }
     if (span < maxSpan) span = span * 2n > maxSpan ? maxSpan : span * 2n;
   }
-  if (behind > 2000n) console.log(`[sync] caught up at block ${head}. Watching for payments.`);
+  if (behind > 2000n) console.log(`[sync] caught up at block ${head}.`);
   nextScanAt = Date.now() + LOGS_EVERY_MS;
+  lastHead = head;
+  // Say so once at start, then a short heartbeat every 10 minutes, so a quiet bot never looks stuck.
+  if (!announcedWatching || Date.now() - lastHeartbeat > 600_000) {
+    lastHeartbeat = Date.now();
+    const n = Object.keys(state.intents).length;
+    console.log(`[watching] up to block ${head}; ${n} registered address${n === 1 ? '' : 'es'}. Payments are delivered within seconds of arriving.`);
+    announcedWatching = true;
+  }
 }
 
 // ---------------------------------------------------------------- landing
@@ -247,6 +258,7 @@ async function tryLand(hash, { depositAddress, intent }, balance) {
 const rpcShown = (() => { try { const u = new URL(RPC_URL); if (/^[\d.]+$|localhost/.test(u.hostname)) return `${u.protocol}//${u.host}`; const host = u.hostname.split('.').slice(-2).join('.'); return `${u.protocol}//${u.hostname.split('.').length > 2 ? '…' : ''}${host}${u.pathname.length > 1 || u.search ? '/…' : ''}`; } catch { return 'RPC'; } })();
 const shown = (url) => { try { const u = new URL(url); if (/^[\d.]+$|localhost/.test(u.hostname)) return `${u.protocol}//${u.host}`; const host = u.hostname.split('.').slice(-2).join('.'); return `${u.protocol}//${u.hostname.split('.').length > 2 ? '…' : ''}${host}${u.pathname.length > 1 || u.search ? '/…' : ''}`; } catch { return 'RPC'; } };
 if (watch !== pub) console.log(`Watching with ${shown(READ_RPC_URL)}; delivering with ${rpcShown}.`);
+console.log('Starting: reading the chain (the first check can take up to a minute on the public RPC)…');
 console.log(`Doorstep keeper on chain ${chainId} (${rpcShown}), contract ${DOORSTEP}, ${wallet ? 'signing as ' + account.address : 'read-only'}`);
 if (account) {
   const bal = await pub.getBalance({ address: account.address });
