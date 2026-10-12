@@ -5,7 +5,7 @@
 - **Try it:** https://phoenix-2203.github.io/doorstep/ (any visitor gets their own savings address on Arc mainnet and can top it up from any wallet or exchange)
 - **Build with it:** the [`doorstep-arc` SDK](sdk/README.md)
 - **Run a delivery bot:** [keeper/README.md](keeper/README.md)
-- **On Arc mainnet (chain 5042):** Doorstep [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080) · demo savings vault [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3)
+- **On Arc mainnet (chain 5042):** Doorstep v2 [`0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229`](https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229) · demo savings vault [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3) · v1 (no cancel, still works for its addresses) [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080)
 
 ## The problem
 
@@ -192,12 +192,13 @@ Put the deployed addresses and deploy block in `web/config.js` before building, 
 
 ## Mainnet proof
 
-Deployed and exercised on Arc mainnet on 2026-10-11 (UTC) with `scripts/demo-mainnet.sh`, which uses only `arc-cast` and a local encrypted keystore. The script checks every receipt's status and the Doorstep event it emitted, and stops at the first mismatch. All steps passed.
+v1 was deployed and exercised on Arc mainnet on 2026-10-11 (UTC) with `scripts/demo-mainnet.sh`; v2 was deployed on 2026-10-12. The rows below the deploys are the v1 run, which uses only `arc-cast` and a local encrypted keystore. The script checks every receipt's status and the Doorstep event it emitted, and stops at the first mismatch. All steps passed.
 
 | Step | What happened | Transaction |
 | --- | --- | --- |
 | Deploy | `Doorstep`, block 25488972, 1,257,811 gas | [`0x26ed6f67…`](https://explorer.arc.io/tx/0x26ed6f676fa6b86140ce919376ca7086148d4a734a8bf94be6b9fd2e39dd3836) |
 | Deploy | `DemoEscrow`, block 25488973, 367,095 gas | [`0x4ac68483…`](https://explorer.arc.io/tx/0x4ac68483dac76c69cba4345049f845b217315b46c4f3c14d518fa8d205583509) |
+| Deploy v2 | `Doorstep` v2 (adds `cancel`), block 25509432, 1,449,011 gas | [`0x32ad069f…`](https://explorer.arc.io/tx/0x32ad069f5b54f137e035aef60526340d20af5bd8d58b06cf264415dfbfcf4a27) |
 | The problem | A plain wallet send of USDC straight to `DemoEscrow` reverts (`eth_estimateGas`) | n/a |
 | Announce | Intent: deposit into `DemoEscrow` for the wallet, refunds to the wallet. Deposit address [`0xEB95f51A…1788a`](https://explorer.arc.io/address/0xEB95f51A3A2c2A931983FDB10939cfb102E1788a) | [`0x7ce28911…`](https://explorer.arc.io/tx/0x7ce28911df29ac79f78219c41d13abe3f8d8e941a2da7362e7feac5d1eb04d83) |
 | Pay (native send) | 0.05 USDC sent to the deposit address like any wallet transfer | [`0x460b05a5…`](https://explorer.arc.io/tx/0x460b05a5def97439d547fb83f3f208e40a7019b7d19a12a2e90033d416484b5d) |
