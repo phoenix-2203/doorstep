@@ -2,7 +2,7 @@ import { createWalletClient, custom, parseUnits, isAddress, getAddress } from 'v
 import qrcode from 'qrcode-generator';
 import {
   createDoorstep, depositIntent, describe, explain, parseLink, toLink, formatUsdc6, formatUsdc18,
-  DoorstepError, DOORSTEP_ABI, LANDER_CODE_HASH,
+  DoorstepError, DOORSTEP_ABI, LANDER_CODE_HASH, paymentState, toUnits6,
 } from '../sdk/src/index.js';
 import { CONFIG, TESTNET } from './config.js';
 
@@ -284,16 +284,19 @@ async function initDev() {
     for (const k of ['target', 'beneficiary', 'refundTo']) {
       if (!isAddress(f[k].value.trim())) throw new DoorstepError(`missing:${k}`);
     }
+    const exact = f.amount.value.trim();
     return depositIntent({
       into: f.target.value.trim(),
       beneficiary: f.beneficiary.value.trim(),
       refundTo: f.refundTo.value.trim(),
-      minimum: f.min.value || '0',
+      // An invoice amount is also the minimum: nothing is delivered until all of it has arrived.
+      minimum: exact || f.min.value || '0',
       keeperFeeCap: f.fee.value || '0',
       expires: `${Number(f.expiry.value)}s`,
       reference: f.ref.value || '',
     });
   };
+  f.amount.addEventListener('input', () => { f.min.disabled = !!f.amount.value.trim(); if (f.amount.value.trim()) f.min.value = f.amount.value.trim(); });
   const preview = () => {
     const box = $('plain');
     try {
@@ -333,7 +336,8 @@ async function initDev() {
         say('create-msg', 'Confirm the registration in your wallet…');
         await ds.announce(intent, { walletClient: w });
       }
-      location.hash = toLink(intent, { baseUrl: '', fromBlock: block.number }).split('#')[1];
+      const exact = f.amount.value.trim();
+      location.hash = toLink(intent, { baseUrl: '', fromBlock: block.number, ...(exact ? { amount: exact } : {}) }).split('#')[1];
     } catch (e) {
       say('create-msg', String(e.message).startsWith('missing:') ? 'Fill in all three addresses first.' : esc(errText(e)), true);
     }
@@ -344,7 +348,7 @@ async function initDev() {
 
 async function initPay(fragment) {
   $('pay-view').hidden = false;
-  const { intent, fromBlock } = parseLink('#' + fragment);
+  const { intent, fromBlock, amount6 } = parseLink('#' + fragment);
   const doorAddr = doorstepFor(fromBlock);
   const ds = clientFor(doorAddr, fromBlock);
   const cancellable = !isLegacy(doorAddr);
@@ -355,9 +359,12 @@ async function initPay(fragment) {
 
   $('addr').textContent = dep;
   renderQr($('qr'), dep);
-  $('pay-lede').textContent = ex.reference && ex.reference !== 'doorstep-savings' ? `Pay ${ex.reference}` : `Deposit to ${targetName}`;
+  const forRef = ex.reference && ex.reference !== 'doorstep-savings' ? ex.reference : '';
+  $('pay-lede').textContent = amount6 !== undefined
+    ? `Pay ${formatUsdc6(amount6)} USDC${forRef ? ` for ${forRef}` : ''}`
+    : forRef ? `Pay ${forRef}` : `Deposit to ${targetName}`;
   $('limits').innerHTML = [
-    ex.minimum !== '0' ? `Minimum ${ex.minimum} USDC` : null,
+    amount6 !== undefined ? `Amount ${formatUsdc6(amount6)} USDC (more is delivered too)` : ex.minimum !== '0' ? `Minimum ${ex.minimum} USDC` : null,
     `Accepted until ${ex.expiresAt.toLocaleString()}`,
     'Arc network, USDC only',
   ].filter(Boolean).join(' · ');
@@ -414,11 +421,13 @@ async function initPay(fragment) {
       door.dataset.state = 'arrived';
       $('light-text').textContent = 'Payment received';
       steps.push(['done', 'Waiting for payment']);
+      const inv = amount6 !== undefined ? paymentState(amount6, { received: st.waitingRaw }) : null;
       const note = st.expired ? 'Past its deadline, so it will be returned.'
+        : inv?.state === 'underpaid' ? `${inv.received} of ${inv.expected} USDC received. Send ${inv.remaining} USDC more to complete the payment.`
         : st.belowMinimum ? `Under the ${ex.minimum} USDC minimum, so it waits for more.`
           : slow ? (registered ? SLOW_TEXT : 'This address isn\'t registered with the delivery bot. Press Deliver it now; your wallet pays the network fee (under $0.01) and gets it straight back from the payment.')
             : 'Delivering automatically, usually within seconds.';
-      steps.push(['now', `Payment received: ${usd(st.waiting)} USDC`, note]);
+      steps.push(['now', amount6 !== undefined && st.belowMinimum ? `Part paid: ${usd(st.waiting)} of ${formatUsdc6(amount6)} USDC` : `Payment received: ${usd(st.waiting)} USDC`, note]);
       steps.push(['', st.expired ? `Returned to ${short(intent.refundTo)}` : `Delivered into ${targetName}`]);
     } else if (last) {
       const ok = last.event === 'Landed';
@@ -426,8 +435,10 @@ async function initPay(fragment) {
       $('light-text').textContent = ok ? 'Delivered' : 'Returned';
       steps.push(['done', 'Waiting for payment']);
       steps.push(['done', 'Payment received']);
+      const paidIn = ok ? last.amountPulled6 * 10n ** 12n + last.keeperFee + last.refunded : 0n;
+      const inv = ok && amount6 !== undefined ? paymentState(amount6, { received: paidIn }) : null;
       steps.push(ok
-        ? ['done', `Delivered ${formatUsdc6(last.amountPulled6)} USDC into ${targetName}`, `Network fee ${formatUsdc18(last.keeperFee)} USDC. ${link('tx/' + last.transactionHash, 'View transaction')}`]
+        ? ['done', `${inv ? (inv.state === 'overpaid' ? `Paid ${inv.received} USDC (${inv.extra} more than asked). ` : 'Paid in full. ') : ''}Delivered ${formatUsdc6(last.amountPulled6)} USDC into ${targetName}`, `Network fee ${formatUsdc18(last.keeperFee)} USDC${last.refunded > 0n ? `; unused fee allowance ${formatUsdc18(last.refunded)} USDC returned to ${short(intent.refundTo)}` : ''}. ${link('tx/' + last.transactionHash, 'View transaction')}`]
         : ['bad', `${last.reasonText === 'cancelled' ? 'Cancelled: ' : ''}${formatUsdc18(last.refunded)} USDC returned to ${short(last.refundTo)}`, `${last.reasonText === 'cancelled' ? 'The refund wallet took it back.' : last.reasonText === 'expired' ? 'It arrived after the deadline.' : 'The contract didn\'t accept it.'} ${link('tx/' + last.transactionHash, 'View transaction')}`]);
       if (!st.expired) steps.push(['', 'Ready for another payment to the same address']);
     } else {
@@ -454,7 +465,9 @@ async function initPay(fragment) {
 
   const run = (fn) => async () => { try { await fn(); } catch (e) { say('pay-msg', esc(errText(e)), true); } };
   $('btn-pay').onclick = run(async () => {
-    const amount = prompt('How much USDC to send?', ex.minimum !== '0' ? ex.minimum : '0.1');
+    const st = await ds.status(intent);
+    const suggested = amount6 !== undefined ? paymentState(amount6, { received: st.waitingRaw }).remaining : ex.minimum !== '0' ? ex.minimum : '0.1';
+    const amount = prompt('How much USDC to send?', suggested !== '0' ? suggested : '0.1');
     if (!amount) return;
     const w = await connect(ds);
     // A plain native transfer: exactly what a wallet's Send button does.
