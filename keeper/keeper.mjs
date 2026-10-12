@@ -84,7 +84,10 @@ const revive = (i) => ({
 // refusal the bot both shrinks the range and waits, longer each time, and says exactly what the RPC
 // replied.
 let span = LOG_SPAN;
-const MIN_SPAN = 50n;
+let maxSpan = LOG_SPAN; // lowered for good if the RPC states its own limit
+const MIN_SPAN = 1n;
+// e.g. QuickNode free plan: "eth_getLogs is limited to a 5 range"; others say "max block range 2000".
+const statedLimit = (e) => { const m = rpcReason(e).match(/limited to a (\d+)|max(?:imum)? (?:block )?range (?:of |is )?(\d+)|(\d+) block range/i); return m ? BigInt(m[1] ?? m[2] ?? m[3]) : null; };
 let backoffMs = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isLimit = (e) => e?.code === -32005 || /limit|range|too many|exceed|too large|response size|rate/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
@@ -100,6 +103,14 @@ async function scan() {
       logs = await pub.getContractEvents({ address: DOORSTEP, abi, eventName: 'Announced', fromBlock: from, toBlock: to });
     } catch (e) {
       if (!isLimit(e)) throw e;
+      const stated = statedLimit(e);
+      if (stated && stated > 0n && stated < maxSpan) {
+        // The RPC told us its range limit: use exactly that from now on, no waiting needed.
+        maxSpan = stated;
+        span = stated;
+        console.log(`[rpc] this endpoint allows ${stated}-block log searches; using that size.`);
+        continue;
+      }
       backoffMs = Math.min(backoffMs ? backoffMs * 2 : 1000, 60_000);
       console.log(`[rpc refused] eth_getLogs blocks ${from}-${to} (${to - from + 1n} blocks): "${rpcReason(e)}". Retrying in ${backoffMs / 1000}s${span > MIN_SPAN ? ' with a smaller range' : ''}.`);
       if (span > MIN_SPAN) span = span / 2n < MIN_SPAN ? MIN_SPAN : span / 2n;
@@ -117,7 +128,7 @@ async function scan() {
     state.cursor = (to + 1n).toString();
     save();
     from = to + 1n;
-    if (span < LOG_SPAN) span = span * 2n > LOG_SPAN ? LOG_SPAN : span * 2n;
+    if (span < maxSpan) span = span * 2n > maxSpan ? maxSpan : span * 2n;
   }
 }
 
@@ -163,7 +174,8 @@ async function tryLand(hash, { depositAddress, intent }) {
   console.log(`[land] ${hash.slice(0, 10)} ${formatUnits(balance, 18)} USDC status=${receipt.status} tx=${hashTx}`);
 }
 
-console.log(`Doorstep keeper on chain ${chainId} (${RPC_URL}), contract ${DOORSTEP}, ${wallet ? 'signing as ' + account.address : 'read-only'}`);
+const rpcShown = (() => { try { const u = new URL(RPC_URL); if (/^[\d.]+$|localhost/.test(u.hostname)) return `${u.protocol}//${u.host}`; const host = u.hostname.split('.').slice(-2).join('.'); return `${u.protocol}//${u.hostname.split('.').length > 2 ? '…' : ''}${host}${u.pathname.length > 1 || u.search ? '/…' : ''}`; } catch { return 'RPC'; } })();
+console.log(`Doorstep keeper on chain ${chainId} (${rpcShown}), contract ${DOORSTEP}, ${wallet ? 'signing as ' + account.address : 'read-only'}`);
 if (account) {
   const bal = await pub.getBalance({ address: account.address });
   console.log(`Bot wallet balance: ${formatUnits(bal, 18)} USDC${bal < 10n ** 16n ? '  (low: send it ~0.1 USDC on Arc for gas; each delivery costs under 0.01 and is repaid)' : ''}`);
