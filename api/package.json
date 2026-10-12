@@ -1,0 +1,8 @@
+{
+  "name": "doorstep-api",
+  "private": true,
+  "type": "module",
+  "description": "Hosted HTTPS API for Doorstep: create payment addresses and invoices, check status, signed webhooks.",
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": { "viem": "2.57.4" }
+}
