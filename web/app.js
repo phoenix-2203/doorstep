@@ -2,7 +2,7 @@ import { createWalletClient, custom, parseUnits, isAddress, getAddress } from 'v
 import qrcode from 'qrcode-generator';
 import {
   createDoorstep, depositIntent, describe, explain, parseLink, toLink, formatUsdc6, formatUsdc18,
-  DoorstepError, DOORSTEP_ABI, LANDER_CODE_HASH, paymentState, toUnits6,
+  DoorstepError, DOORSTEP_ABI, LANDER_CODE_HASH, paymentState, toUnits6, intentHash as intentHashOf,
 } from '../sdk/src/index.js';
 import { CONFIG, TESTNET } from './config.js';
 
@@ -29,9 +29,19 @@ function doorstepFor(fromBlock) {
 }
 const isLegacy = (addr) => legacy.some((l) => l.doorstep === addr);
 
+// Arc's public RPC allows about one request per second per visitor, so the page paces its log
+// searches (pauseMs), retries once, and polls gently.
+const POLL_MS = 8000;
 const clientFor = (doorstep, fromBlock) => createDoorstep({
   chainId, rpcUrl: net.rpcUrl, explorer: net.explorer, doorstep, fromBlock: fromBlock ?? CURRENT_FROM,
+  pauseMs: 1100, retryCount: 1,
 });
+const isBusy = (e) => e?.status === 429 || /rate.?limit|too many requests|429/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+const BUSY_TEXT = "Arc's public network connection is busy. Retrying in a few seconds…";
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode: fine */ } },
+};
 
 const ESCROW_ABI = [
   { type: 'function', name: 'balanceOf6', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
@@ -130,8 +140,11 @@ async function initHome() {
   let intent;
   let dep;
   let registered = false;
+  let regKey = '';
   let events = [];
   let cursor = CURRENT_FROM;
+  let tickNo = 0;
+  let lastWaiting = 0n;
 
   const mark = (n, state) => { $(`s${n}`).classList.remove('done', 'now'); if (state) $(`s${n}`).classList.add(state); };
 
@@ -142,15 +155,35 @@ async function initHome() {
     say('s1-msg', `Connected as <span class="mono">${short(w.account.address)}</span>.`);
     $('btn-connect').textContent = 'Connected';
     $('btn-connect').disabled = true;
+    regKey = `doorstep:registered:${ds.doorstep}:${w.account.address}`;
+    try { cursor = (await ds.publicClient.getBlockNumber({ cacheTime: 0 })) - 2000n; } catch { /* keep default */ }
+    if (store.get(regKey)) { registered = true; showAddress(); } else await checkRegistered();
+    loop();
+  }
+
+  // Is this wallet's savings address already registered? Remembered after the first answer, so
+  // later visits don't search the chain again. Retries calmly if the network is busy.
+  let checkTries = 0;
+  async function checkRegistered() {
     $('home-light').textContent = 'Checking your address…';
-    registered = await ds.isAnnounced(intent);
-    if (registered) showAddress();
-    else {
+    say('s2-msg', 'Checking whether your address is already set up…');
+    try {
+      registered = await ds.isAnnounced(intent);
+      if (registered) { store.set(regKey, '1'); showAddress(); return; }
       mark(2, 'now');
       $('btn-create').disabled = false;
+      say('s2-msg', '');
       $('home-light').textContent = 'One step to get your address';
+    } catch (e) {
+      checkTries += 1;
+      if (checkTries >= 2) {
+        // Don't leave the visitor stuck: registering twice is harmless (it costs under $0.01).
+        mark(2, 'now');
+        $('btn-create').disabled = false;
+        say('s2-msg', `${isBusy(e) ? BUSY_TEXT : esc(errText(e))} If you already did this step, there's no need to repeat it; still checking in the background.`);
+      } else say('s2-msg', isBusy(e) ? BUSY_TEXT : esc(errText(e)));
+      setTimeout(() => { if (!registered) checkRegistered(); }, 10_000);
     }
-    loop();
   }
 
   function showAddress() {
@@ -176,6 +209,7 @@ async function initHome() {
       say('s2-msg', 'Confirm in your wallet…');
       const { hash } = await ds.announce(intent, { walletClient: w });
       registered = true;
+      store.set(regKey, '1');
       showAddress();
       say('s2-msg', `Registered. ${link('tx/' + hash, 'View transaction')}`);
     } catch (e) {
@@ -209,42 +243,65 @@ async function initHome() {
     try { await withdrawAll(ds, intent.refundTo, 's4-msg', refresh); } catch (e) { say('s4-msg', esc(errText(e)), true); }
   };
 
+  // Two cheap reads per round: what's waiting at the address, and the savings balance. A delivery
+  // shows up as the balance going up, so no log search is needed to notice it; log searches only
+  // add the transaction link (every few rounds) and catch returned payments.
+  let prevBal = null;
+  let lastDelivered = 0n;
   async function refresh() {
-    if (!intent) return;
-    const [st, head, bal] = await Promise.all([
-      ds.status(intent),
-      ds.publicClient.getBlockNumber({ cacheTime: 0 }),
+    if (!intent || !registered) return;
+    tickNo += 1;
+    const [waiting, bal] = await Promise.all([
+      ds.publicClient.getBalance({ address: dep }),
       ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [intent.refundTo] }),
     ]);
-    if (cursor <= head) {
-      events = events.concat(await ds.history(intent, { fromBlock: cursor, toBlock: head }));
-      cursor = head + 1n;
+    if (prevBal !== null && bal > prevBal) lastDelivered = bal - prevBal;
+    const balanceRose = prevBal !== null && bal > prevBal;
+    prevBal = bal;
+    const justDelivered = (lastWaiting > 0n && waiting === 0n) || balanceRose;
+    lastWaiting = waiting;
+    if (justDelivered || tickNo % 4 === 1) {
+      try {
+        const head = await ds.publicClient.getBlockNumber({ cacheTime: 0 });
+        if (cursor <= head) {
+          events = events.concat(await ds.history(intent, { fromBlock: cursor, toBlock: head }));
+          cursor = head + 1n;
+        }
+      } catch (e) { if (!isBusy(e)) throw e; /* links can wait for the next round */ }
     }
     $('home-balance').textContent = `${usd(formatUsdc6(bal))} USDC`;
     $('btn-home-withdraw').disabled = bal === 0n;
     const door = $('door-home');
     const last = events[events.length - 1];
-    if (st.waitingRaw > 0n) {
+    const belowMinimum = waiting / 10n ** 12n < intent.minAmount6;
+    if (waiting > 0n) {
+      const amt = usd(formatUsdc18(waiting));
       door.dataset.state = 'arrived';
       $('home-light').textContent = 'Payment arrived';
-      $('s4-status').innerHTML = st.belowMinimum
-        ? `${usd(st.waiting)} USDC arrived. That's under the 0.01 USDC minimum, so it waits for more.`
-        : registered ? `${usd(st.waiting)} USDC arrived. Delivering it into your savings…` : `${usd(st.waiting)} USDC arrived.`;
+      $('s4-status').innerHTML = belowMinimum
+        ? `${amt} USDC arrived. That's under the 0.01 USDC minimum, so it waits for more.`
+        : `${amt} USDC arrived. Delivering it into your savings…`;
       mark(3, 'done'); mark(4, 'now');
       arrivedAt ||= Date.now();
-      const slow = !st.belowMinimum && Date.now() - arrivedAt > SLOW_MS;
+      const slow = !belowMinimum && Date.now() - arrivedAt > SLOW_MS;
       $('btn-home-deliver').hidden = !slow;
-      if (slow) $('s4-status').innerHTML = `${usd(st.waiting)} USDC arrived. ${SLOW_TEXT}`;
-    } else if (last) {
+      if (slow) $('s4-status').innerHTML = `${amt} USDC arrived. ${SLOW_TEXT}`;
+    } else if (lastDelivered > 0n || last) {
       arrivedAt = 0;
       $('btn-home-deliver').hidden = true;
-      door.dataset.state = last.event === 'Landed' ? 'landed' : 'bounced';
-      $('home-light').textContent = last.event === 'Landed' ? 'Delivered' : 'Returned';
-      $('s4-status').innerHTML = last.event === 'Landed'
-        ? `Last payment: ${formatUsdc6(last.amountPulled6)} USDC delivered into your savings. Network fee ${usd(formatUsdc18(last.keeperFee))} USDC${last.refunded > 0n ? `; the unused ${usd(formatUsdc18(last.refunded))} USDC of the fee allowance went back to your wallet` : ''}. ${link('tx/' + last.transactionHash, 'View transaction')}`
-        : `Last payment was returned to your wallet (${last.reasonText}). ${link('tx/' + last.transactionHash, 'View transaction')}`;
+      const landed = last && last.event === 'Landed';
+      const returned = last && last.event === 'Bounced' && !lastDelivered;
+      door.dataset.state = returned ? 'bounced' : 'landed';
+      $('home-light').textContent = returned ? 'Returned' : 'Delivered';
+      if (returned) {
+        $('s4-status').innerHTML = `Last payment was returned to your wallet (${last.reasonText}). ${link('tx/' + last.transactionHash, 'View transaction')}`;
+      } else {
+        const amount = landed ? formatUsdc6(last.amountPulled6) : formatUsdc6(lastDelivered);
+        const fee = landed ? ` Network fee ${usd(formatUsdc18(last.keeperFee))} USDC${last.refunded > 0n ? `; the unused ${usd(formatUsdc18(last.refunded))} USDC of the fee allowance went back to your wallet` : ''}. ${link('tx/' + last.transactionHash, 'View transaction')}` : '';
+        $('s4-status').innerHTML = `Last payment: ${amount} USDC delivered into your savings.${fee}`;
+      }
       mark(3, 'done'); mark(4, 'done');
-    } else if (registered) {
+    } else {
       door.dataset.state = 'idle';
       $('home-light').textContent = 'Ready for payments';
     }
@@ -255,8 +312,8 @@ async function initHome() {
     if (looping) return;
     looping = true;
     const tick = async () => {
-      try { await refresh(); } catch (e) { say('s4-msg', `Couldn't reach Arc: ${esc(errText(e))}`, true); }
-      setTimeout(tick, 6000);
+      try { await refresh(); say('s4-msg', ''); } catch (e) { say('s4-msg', isBusy(e) ? BUSY_TEXT : `Couldn't reach Arc: ${esc(errText(e))}`, !isBusy(e)); }
+      setTimeout(tick, POLL_MS);
     };
     tick();
   }
@@ -382,14 +439,17 @@ async function initPay(fragment) {
   $('btn-cancel').hidden = !cancellable;
 
   let registered = false;
+  const regKeyPay = `doorstep:registered:${ds.doorstep}:${intentHashOf(intent)}`;
   const showRegistered = async () => {
-    registered = await ds.isAnnounced(intent, { fromBlock });
+    registered = !!store.get(regKeyPay) || await ds.isAnnounced(intent, { fromBlock });
+    if (registered) store.set(regKeyPay, '1');
     $('btn-announce').hidden = registered;
     $('bots').innerHTML = registered
       ? 'This address is registered for automatic delivery.'
       : 'This address isn\'t registered for automatic delivery. Register it once (under $0.01), or press Deliver now after each payment.';
   };
-  showRegistered().catch(() => {});
+  const retryRegistered = () => showRegistered().catch(() => setTimeout(retryRegistered, 10_000));
+  retryRegistered();
 
   if (isEscrow && ex.beneficiary) {
     $('escrow-box').hidden = false;
@@ -403,11 +463,19 @@ async function initPay(fragment) {
   let events = [];
   let cursor = fromBlock;
   let arrivedAt = 0;
+  let tickNo = 0;
+  let lastWaiting = 0n;
   async function refresh() {
-    const [st, head] = await Promise.all([ds.status(intent), ds.publicClient.getBlockNumber({ cacheTime: 0 })]);
-    if (cursor <= head) {
-      events = events.concat(await ds.history(intent, { fromBlock: cursor, toBlock: head }));
-      cursor = head + 1n;
+    tickNo += 1;
+    const st = await ds.status(intent);
+    const changed = lastWaiting > 0n && st.waitingRaw === 0n;
+    lastWaiting = st.waitingRaw;
+    if (changed || tickNo % 3 === 1) {
+      const head = await ds.publicClient.getBlockNumber({ cacheTime: 0 });
+      if (cursor <= head) {
+        events = events.concat(await ds.history(intent, { fromBlock: cursor, toBlock: head }));
+        cursor = head + 1n;
+      }
     }
     const last = events[events.length - 1];
     $('amount').innerHTML = `${usd(st.waiting)}<small>USDC waiting</small>`;
@@ -495,12 +563,13 @@ async function initPay(fragment) {
     const w = await connect(ds);
     const { hash } = await ds.announce(intent, { walletClient: w });
     say('pay-msg', `Registered for automatic delivery. ${link('tx/' + hash, 'View transaction')}`);
+    store.set(regKeyPay, '1');
     showRegistered().catch(() => {});
   });
 
   const loop = async () => {
-    try { await refresh(); } catch (e) { say('pay-msg', `Couldn't reach Arc: ${esc(errText(e))}`, true); }
-    setTimeout(loop, 6000);
+    try { await refresh(); } catch (e) { say('pay-msg', isBusy(e) ? BUSY_TEXT : `Couldn't reach Arc: ${esc(errText(e))}`, !isBusy(e)); }
+    setTimeout(loop, POLL_MS);
   };
   loop();
 }
