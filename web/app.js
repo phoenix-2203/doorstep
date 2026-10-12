@@ -4,7 +4,7 @@ import {
   createDoorstep, depositIntent, describe, explain, parseLink, toLink, formatUsdc6, formatUsdc18,
   DoorstepError, DOORSTEP_ABI, LANDER_CODE_HASH, paymentState, toUnits6, intentHash as intentHashOf,
 } from '../sdk/src/index.js';
-import { CONFIG, TESTNET } from './config.js';
+import { CONFIG, SITE, TESTNET } from './config.js';
 
 // ---------------------------------------------------------------- config
 
@@ -51,6 +51,7 @@ const $ = (id) => document.getElementById(id);
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const chainName = chainId === 5042 ? 'Arc' : chainId === 5042002 ? 'Arc Testnet' : 'Local Arc node';
 $('net').innerHTML = `<b>${chainName}</b>`;
+for (const el of document.querySelectorAll('.api-link')) el.href = `${SITE.api}/docs`;
 const link = (path, text) => `<a href="${net.explorer}/${path}" target="_blank" rel="noopener">${text}</a>`;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd = (s) => Number(s).toLocaleString(undefined, { maximumFractionDigits: 6 });
