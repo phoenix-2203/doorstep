@@ -38,7 +38,7 @@ const RPC_URL = process.env.RPC_URL ?? 'https://rpc.mainnet.arc.io';
 const DOORSTEP = process.env.DOORSTEP;
 const FROM_BLOCK = BigInt(process.env.FROM_BLOCK ?? '0');
 const POLL_MS = Number(process.env.POLL_MS ?? 2000);
-const LOG_SPAN = 9_000n; // Arc's public RPC rejects eth_getLogs ranges of 10,000+ blocks
+const LOG_SPAN = BigInt(process.env.LOG_SPAN ?? 9000); // blocks per eth_getLogs call; Arc's public RPC caps ranges at 10,000
 const STATE_FILE = process.env.STATE_FILE ?? new URL('./keeper-state.json', import.meta.url).pathname;
 const MIN_FEE = parseGwei('20'); // Arc mempool floor; lower maxFeePerGas is silently dropped
 
@@ -79,9 +79,15 @@ const revive = (i) => ({
 
 // Arc's public RPC refuses some eth_getLogs ranges ("Request exceeds defined limit"), so the span
 // shrinks on refusal and grows back after successes.
+// The same error (-32005, "Request exceeds defined limit") is also used for rate limiting, so on a
+// refusal the bot both shrinks the range and waits, longer each time, and says exactly what the RPC
+// replied.
 let span = LOG_SPAN;
 const MIN_SPAN = 50n;
-const isRangeLimit = (e) => /limit|range|too many|exceed|too large|response size/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+let backoffMs = 0;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isLimit = (e) => e?.code === -32005 || /limit|range|too many|exceed|too large|response size|rate/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+const rpcReason = (e) => (e?.details || e?.cause?.details || e?.shortMessage || e?.message || String(e)).toString().split('\n')[0];
 
 async function scan() {
   const head = await pub.getBlockNumber({ cacheTime: 0 });
@@ -92,10 +98,14 @@ async function scan() {
     try {
       logs = await pub.getContractEvents({ address: DOORSTEP, abi, eventName: 'Announced', fromBlock: from, toBlock: to });
     } catch (e) {
-      if (!isRangeLimit(e) || span <= MIN_SPAN) throw e;
-      span = span / 2n < MIN_SPAN ? MIN_SPAN : span / 2n;
+      if (!isLimit(e)) throw e;
+      backoffMs = Math.min(backoffMs ? backoffMs * 2 : 1000, 60_000);
+      console.log(`[rpc refused] eth_getLogs blocks ${from}-${to} (${to - from + 1n} blocks): "${rpcReason(e)}". Retrying in ${backoffMs / 1000}s${span > MIN_SPAN ? ' with a smaller range' : ''}.`);
+      if (span > MIN_SPAN) span = span / 2n < MIN_SPAN ? MIN_SPAN : span / 2n;
+      await sleep(backoffMs);
       continue;
     }
+    backoffMs = 0;
     for (const log of logs) {
       const { intentHash, depositAddress, intent } = log.args;
       if (!state.intents[intentHash]) {
@@ -162,7 +172,8 @@ for (;;) {
     await scan();
     for (const [h, entry] of Object.entries(state.intents)) await tryLand(h, entry);
   } catch (e) {
-    console.error('[error]', e.shortMessage ?? e.message);
+    console.error(`[error] ${e.shortMessage ?? e.message}${e.details && e.details !== e.shortMessage ? ` (RPC said: "${rpcReason(e)}")` : ''}`);
+    if (isLimit(e)) await sleep(10_000);
   }
   await new Promise((r) => setTimeout(r, POLL_MS));
 }
