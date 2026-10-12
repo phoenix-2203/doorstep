@@ -1,8 +1,11 @@
 # Doorstep
 
-**Deposit addresses that fund any Arc contract on arrival.** A sender presses Send in any wallet, withdraws from an exchange, or bridges with CCTP. Doorstep deposits the USDC into the contract you chose, credited to the person you chose, or sends it back if that isn't possible.
+**Let people pay into your Arc app from any wallet or exchange.** On Arc, a wallet's "Send USDC" can't pay into most vaults, escrows and checkouts, because they only accept money through their own deposit function. Doorstep gives each payer an address. Whatever arrives there is deposited into your contract, credited to the right person, within seconds, or sent back if that isn't possible.
 
-Live on Arc mainnet (chain 5042): Doorstep [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080) · Demo escrow [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3) · App: https://phoenix-2203.github.io/doorstep/
+- **Try it:** https://phoenix-2203.github.io/doorstep/ (any visitor gets their own savings address on Arc mainnet and can top it up from any wallet or exchange)
+- **Build with it:** the [`doorstep-arc` SDK](sdk/README.md)
+- **Run a delivery bot:** [keeper/README.md](keeper/README.md)
+- **On Arc mainnet (chain 5042):** Doorstep [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080) · demo savings vault [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3)
 
 ## The problem
 
@@ -18,7 +21,7 @@ The same wall blocks every route that can only deliver to an address:
 
 None of them can call `deposit(amount, beneficiary)` for the user.
 
-`DemoEscrow` in this repo is that ordinary escrow, and `test_plainWalletSendToEscrowReverts` shows the failure. Its `deposit(uint256 amount, address beneficiary)` has the same selector (`0x6e553f65`) and argument order as ERC-4626 `deposit(assets, receiver)`, so the same intent shape funds any ERC-4626 vault on Arc.
+`DemoEscrow` in this repo (shown in the app as the demo savings vault) is that ordinary escrow, and `test_plainWalletSendToEscrowReverts` shows the failure. Its `deposit(uint256 amount, address beneficiary)` has the same selector (`0x6e553f65`) and argument order as ERC-4626 `deposit(assets, receiver)`, so the same intent shape funds any ERC-4626 vault on Arc.
 
 ## Instructions in plain words
 
