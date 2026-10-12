@@ -215,7 +215,7 @@ pre.code { background: #0F141B; color: #E7EBEF; border-radius: 10px; padding: 14
           <div><h3>See it arrive in your savings</h3>
             <p id="s4-status">Your balance in the vault updates here within seconds of each payment.</p>
             <div class="big" id="home-balance">–</div>
-            <div class="actions" style="margin-top:10px"><button type="button" class="quiet" id="btn-home-withdraw" disabled>Withdraw to my wallet</button></div>
+            <div class="actions" style="margin-top:10px"><button type="button" id="btn-home-deliver" hidden>Deliver it now</button><button type="button" class="quiet" id="btn-home-withdraw" disabled>Withdraw to my wallet</button></div>
             <p class="msg" id="s4-msg" role="status"></p></div>
         </div>
       </section>
@@ -330,7 +330,7 @@ ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
         <section class="card">
           <h2>Status</h2>
           <ol class="timeline" id="timeline"></ol>
-          <div class="actions"><button id="btn-pay" type="button">Send from my wallet</button><button id="btn-copy" class="quiet" type="button">Copy link</button></div>
+          <div class="actions"><button id="btn-pay" type="button">Send from my wallet</button><button id="btn-deliver-main" type="button" hidden>Deliver it now</button><button id="btn-copy" class="quiet" type="button">Copy link</button></div>
           <p class="msg" id="pay-msg" role="status"></p>
           <p class="note" id="limits"></p>
         </section>
@@ -371,6 +371,6 @@ ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
 
   <footer>Doorstep is unaudited and new. Use small amounts. <a href="https://github.com/phoenix-2203/doorstep">Source, tests and mainnet proof</a>.</footer>
 </div>
-<script type="module" src="./app-RC5EE6FF.js"></script>
+<script type="module" src="./app-ZENDU2WU.js"></script>
 </body>
 </html>
