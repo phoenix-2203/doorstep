@@ -110,6 +110,10 @@ async function withdrawAll(ds, owner, msgId, after) {
   after?.();
 }
 
+// If the delivery bot hasn't picked a payment up after this long, offer to deliver it by hand.
+const SLOW_MS = 15_000;
+const SLOW_TEXT = 'Taking longer than usual: the delivery bot may be offline. You can deliver it yourself; your wallet pays the network fee (under $0.01) and gets it straight back from the payment.';
+
 // ---------------------------------------------------------------- home: try it
 
 // Each visitor's savings address is fixed: same wallet, same instructions, same address, every visit.
@@ -190,6 +194,17 @@ async function initHome() {
   $('btn-home-copy').onclick = async () => {
     try { await navigator.clipboard.writeText(dep); say('s3-msg', 'Address copied. Paste it into any wallet or exchange withdrawal, on the Arc network.'); } catch (e) { say('s3-msg', esc(errText(e)), true); }
   };
+  let arrivedAt = 0;
+  $('btn-home-deliver').onclick = async () => {
+    try {
+      const w = await connect(ds);
+      say('s4-msg', 'Delivering… confirm in your wallet.');
+      const { hash } = await ds.land(intent, { walletClient: w });
+      say('s4-msg', `Delivered. ${link('tx/' + hash, 'View transaction')}`);
+      $('btn-home-deliver').hidden = true;
+      refresh();
+    } catch (e) { say('s4-msg', esc(errText(e)), true); }
+  };
   $('btn-home-withdraw').onclick = async () => {
     try { await withdrawAll(ds, intent.refundTo, 's4-msg', refresh); } catch (e) { say('s4-msg', esc(errText(e)), true); }
   };
@@ -216,7 +231,13 @@ async function initHome() {
         ? `${usd(st.waiting)} USDC arrived. That's under the 0.01 USDC minimum, so it waits for more.`
         : registered ? `${usd(st.waiting)} USDC arrived. Delivering it into your savings…` : `${usd(st.waiting)} USDC arrived.`;
       mark(3, 'done'); mark(4, 'now');
+      arrivedAt ||= Date.now();
+      const slow = !st.belowMinimum && Date.now() - arrivedAt > SLOW_MS;
+      $('btn-home-deliver').hidden = !slow;
+      if (slow) $('s4-status').innerHTML = `${usd(st.waiting)} USDC arrived. ${SLOW_TEXT}`;
     } else if (last) {
+      arrivedAt = 0;
+      $('btn-home-deliver').hidden = true;
       door.dataset.state = last.event === 'Landed' ? 'landed' : 'bounced';
       $('home-light').textContent = last.event === 'Landed' ? 'Delivered' : 'Returned';
       $('s4-status').innerHTML = last.event === 'Landed'
@@ -374,6 +395,7 @@ async function initPay(fragment) {
   const door = $('door');
   let events = [];
   let cursor = fromBlock;
+  let arrivedAt = 0;
   async function refresh() {
     const [st, head] = await Promise.all([ds.status(intent), ds.publicClient.getBlockNumber({ cacheTime: 0 })]);
     if (cursor <= head) {
@@ -385,13 +407,17 @@ async function initPay(fragment) {
 
     // Timeline: Waiting for payment -> Payment received -> Delivered | Returned
     const steps = [];
+    if (st.waitingRaw > 0n) arrivedAt ||= Date.now(); else arrivedAt = 0;
+    const slow = st.waitingRaw > 0n && !st.belowMinimum && Date.now() - arrivedAt > (registered ? SLOW_MS : 0);
+    $('btn-deliver-main').hidden = !slow;
     if (st.waitingRaw > 0n) {
       door.dataset.state = 'arrived';
       $('light-text').textContent = 'Payment received';
       steps.push(['done', 'Waiting for payment']);
       const note = st.expired ? 'Past its deadline, so it will be returned.'
         : st.belowMinimum ? `Under the ${ex.minimum} USDC minimum, so it waits for more.`
-          : registered ? 'Delivering automatically, usually within seconds.' : 'Waiting for delivery (see Advanced).';
+          : slow ? (registered ? SLOW_TEXT : 'This address isn\'t registered with the delivery bot. Press Deliver it now; your wallet pays the network fee (under $0.01) and gets it straight back from the payment.')
+            : 'Delivering automatically, usually within seconds.';
       steps.push(['now', `Payment received: ${usd(st.waiting)} USDC`, note]);
       steps.push(['', st.expired ? `Returned to ${short(intent.refundTo)}` : `Delivered into ${targetName}`]);
     } else if (last) {
@@ -436,6 +462,7 @@ async function initPay(fragment) {
     say('pay-msg', `Sent. ${link('tx/' + tx, 'View transaction')}`);
   });
   $('btn-copy').onclick = run(async () => { await navigator.clipboard.writeText(location.href); say('pay-msg', 'Link copied.'); });
+  $('btn-deliver-main').onclick = () => $('btn-land').click();
   $('btn-land').onclick = run(async () => {
     const w = await connect(ds);
     say('pay-msg', 'Delivering…');
