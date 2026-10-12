@@ -319,7 +319,12 @@ const toB64 = (s) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+
 const fromB64 = (s) => atob(s.replace(/-/g, '+').replace(/_/g, '/'));
 
 /** Link to the Doorstep app's pay page for this intent: "<baseUrl>?doorstep=…#i=…". */
-export function toLink(intent, { baseUrl = 'https://phoenix-2203.github.io/doorstep/', fromBlock = 0n, doorstep, chainId } = {}) {
+/**
+ * Link to the Doorstep app's pay page. Pass `amount` (USDC) to ask for an exact amount: the page
+ * then shows "Pay 25 USDC" and tracks underpayment. It doesn't change the address (it isn't part of
+ * the instructions); use `minimum` in the intent so nothing is delivered before it's all there.
+ */
+export function toLink(intent, { baseUrl = 'https://phoenix-2203.github.io/doorstep/', fromBlock = 0n, doorstep, chainId, amount } = {}) {
   const payload = toB64(JSON.stringify({
     ...intent,
     amountOffset: Number(intent.amountOffset),
@@ -327,6 +332,7 @@ export function toLink(intent, { baseUrl = 'https://phoenix-2203.github.io/doors
     maxKeeperFee6: intent.maxKeeperFee6.toString(),
     expiry: intent.expiry.toString(),
     b: BigInt(fromBlock).toString(),
+    ...(amount !== undefined ? { a: toUnits6(amount, 'amount').toString() } : {}),
   }));
   const q = new URLSearchParams();
   if (doorstep) q.set('doorstep', getAddress(doorstep));
@@ -358,7 +364,26 @@ export function parseLink(link) {
     if (p.get('doorstep')) doorstep = getAddress(p.get('doorstep'));
     if (p.get('chain')) chainId = Number(p.get('chain'));
   }
-  return { intent, fromBlock: BigInt(o.b ?? 0), doorstep, chainId };
+  return { intent, fromBlock: BigInt(o.b ?? 0), doorstep, chainId, amount6: o.a !== undefined ? BigInt(o.a) : undefined };
+}
+
+/**
+ * Compare what arrived with an expected amount (an invoice). `received` is native units
+ * (18 decimals), e.g. status().waitingRaw, or 6-decimal units if `received6` is used.
+ * Returns { state: 'unpaid' | 'underpaid' | 'paid' | 'overpaid', expected, received, remaining, extra }
+ * with amounts as USDC strings.
+ */
+export function paymentState(expected6, { received, received6 } = {}) {
+  const exp = BigInt(expected6);
+  const got6 = received6 !== undefined ? BigInt(received6) : BigInt(received ?? 0n) / SCALE;
+  const state = got6 === 0n ? 'unpaid' : got6 < exp ? 'underpaid' : got6 === exp ? 'paid' : 'overpaid';
+  return {
+    state,
+    expected: formatUsdc6(exp),
+    received: formatUsdc6(got6),
+    remaining: formatUsdc6(got6 < exp ? exp - got6 : 0n),
+    extra: formatUsdc6(got6 > exp ? got6 - exp : 0n),
+  };
 }
 
 // ---------------------------------------------------------------- on-chain client
@@ -567,6 +592,7 @@ export function createDoorstep(opts = {}) {
     depositAddress: (intent) => depositAddress(intent, DOOR),
     describe,
     explain,
+    paymentState,
     toLink: (intent, o = {}) => toLink(intent, { fromBlock: fromBlockDefault, doorstep: opts.doorstep ? DOOR : undefined, chainId: chainId !== 5042 ? chainId : undefined, ...o }),
     parseLink,
     status,

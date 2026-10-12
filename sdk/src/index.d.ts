@@ -132,8 +132,9 @@ export interface DoorstepClient {
   depositAddress(intent: Intent): Address;
   describe(intent: Intent, o?: DescribeOptions): string;
   explain(intent: Intent, o?: DescribeOptions): Explanation;
-  toLink(intent: Intent, o?: { baseUrl?: string; fromBlock?: bigint }): string;
-  parseLink(link: string): { intent: Intent; fromBlock: bigint; doorstep?: Address; chainId?: number };
+  toLink(intent: Intent, o?: { baseUrl?: string; fromBlock?: bigint; amount?: UsdcAmount }): string;
+  parseLink(link: string): { intent: Intent; fromBlock: bigint; doorstep?: Address; chainId?: number; amount6?: bigint };
+  paymentState(expected6: bigint, o: { received?: bigint; received6?: bigint }): PaymentState;
   status(intent: Intent): Promise<Status>;
   isAnnounced(intent: Intent, o?: { fromBlock?: bigint }): Promise<boolean>;
   history(intent: Intent, o?: { fromBlock?: bigint; toBlock?: bigint }): Promise<DoorstepEvent[]>;
@@ -168,8 +169,10 @@ export function intentHash(intent: Intent): Hex;
 export function depositAddress(intent: Intent, doorstep: Address): Address;
 export function explain(intent: Intent, o?: DescribeOptions): Explanation;
 export function describe(intent: Intent, o?: DescribeOptions): string;
-export function toLink(intent: Intent, o?: { baseUrl?: string; fromBlock?: bigint; doorstep?: Address; chainId?: number }): string;
-export function parseLink(link: string): { intent: Intent; fromBlock: bigint; doorstep?: Address; chainId?: number };
+export function toLink(intent: Intent, o?: { baseUrl?: string; fromBlock?: bigint; doorstep?: Address; chainId?: number; amount?: UsdcAmount }): string;
+export interface PaymentState { state: 'unpaid' | 'underpaid' | 'paid' | 'overpaid'; expected: string; received: string; remaining: string; extra: string }
+export function paymentState(expected6: bigint, o: { received?: bigint; received6?: bigint }): PaymentState;
+export function parseLink(link: string): { intent: Intent; fromBlock: bigint; doorstep?: Address; chainId?: number; amount6?: bigint };
 export function toUnits6(v: UsdcAmount, field?: string): bigint;
 export function toExpiry(e: Expires, now?: number): bigint;
 export function toRef(reference?: string): Hex;
