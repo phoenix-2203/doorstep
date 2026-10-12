@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doorstep: payments into your Arc app from any wallet or exchange</title>
+<meta name="description" content="Give each payer an address. USDC sent there from any wallet or exchange is deposited into your Arc contract for the right person within seconds, or sent back.">
+<meta property="og:title" content="Doorstep">
+<meta property="og:description" content="Let people pay into your Arc app from any wallet or exchange.">
+<script>
+  // Old pay links (…/doorstep/#i=…) and the old developer view now live under app/.
+  if (/^#(i=|developers)/.test(location.hash)) location.replace('app/' + location.search + location.hash);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --fog: #E9EEF2;
+  --fog-2: #DCE3E9;
+  --ink: #18212E;
+  --ink-2: #4A5567;
+  --door: #234B73;
+  --door-deep: #1A3A5A;
+  --brass: #B5852F;
+  --landed: #2E7D5B;
+  --back: #9A4434;
+  --line: #C5CED7;
+  --sheet: #F7F9FB;
+  --code-bg: #142133;
+  --code-ink: #E3EAF2;
+  --focus: #234B73;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fog: #121923; --fog-2: #182230; --ink: #E6ECF2; --ink-2: #A6B2C1; --door: #3C6E9E; --door-deep: #2A557E;
+    --line: #2B3747; --sheet: #172130; --code-bg: #0C1520; --focus: #8DB6DE; --landed: #4FB287; --back: #D27A68;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--fog); color: var(--ink); font: 400 17px/1.6 "Instrument Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--door); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+h1, h2, h3 { font-family: "Bricolage Grotesque", sans-serif; letter-spacing: -0.02em; margin: 0; }
+h2 { font-weight: 600; font-size: clamp(28px, 3.6vw, 40px); line-height: 1.12; max-width: 22ch; }
+h3 { font-weight: 600; font-size: 20px; line-height: 1.25; }
+p { margin: 0; }
+.lead { color: var(--ink-2); max-width: 62ch; margin-top: 14px; font-size: 18px; }
+section.band { padding: 104px 0; border-top: 1px solid var(--line); }
+@media (max-width: 720px) { section.band { padding: 72px 0; } }
+
+/* nav */
+header.nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--fog) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid transparent; }
+header.nav.scrolled { border-bottom-color: var(--line); }
+header.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; height: 68px; }
+.mark { display: flex; align-items: center; gap: 10px; font: 800 22px/1 "Bricolage Grotesque", sans-serif; letter-spacing: -0.03em; color: var(--ink); text-decoration: none; }
+.mark svg { width: 22px; height: 28px; }
+nav.links { display: flex; align-items: center; gap: 26px; font-size: 15px; }
+nav.links a { color: var(--ink-2); text-decoration: none; }
+nav.links a:hover { color: var(--ink); }
+@media (max-width: 820px) { nav.links .hide-sm { display: none; } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 15px "Instrument Sans", sans-serif; padding: 12px 20px; border-radius: 10px; text-decoration: none; border: 1.5px solid var(--door); cursor: pointer; transition: background .15s, color .15s; }
+.btn.solid { background: var(--door); color: #fff; }
+.btn.solid:hover { background: var(--door-deep); border-color: var(--door-deep); }
+.btn.line { background: transparent; color: var(--door); }
+.btn.line:hover { background: color-mix(in srgb, var(--door) 8%, transparent); }
+nav.links .btn { padding: 9px 16px; color: #fff; }
+
+/* hero */
+.hero { padding: 72px 0 96px; }
+.hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
+@media (max-width: 920px) { .hero .wrap { grid-template-columns: 1fr; gap: 48px; } }
+.hero h1 { font-weight: 800; font-size: clamp(40px, 5.6vw, 66px); line-height: 1.02; letter-spacing: -0.035em; max-width: 14ch; }
+.hero .lead { font-size: 19px; margin-top: 22px; max-width: 46ch; }
+.hero .ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+.hero .fine { margin-top: 18px; font-size: 14px; color: var(--ink-2); }
+
+/* the scene: a payment arriving at the door and going inside */
+.scene { position: relative; background: var(--sheet); border: 1px solid var(--line); border-radius: 22px; padding: 28px 28px 60px; min-height: 470px; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; overflow: hidden; }
+@media (max-width: 520px) { .scene { grid-template-columns: 1fr; padding: 20px; } }
+.payment { align-self: start; justify-self: start; background: var(--fog); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14px; max-width: 220px; opacity: 0; transform: translateX(-24px); transition: opacity .5s, transform .7s cubic-bezier(.2,.8,.2,1); }
+.payment b { display: block; font-size: 18px; font-family: "Bricolage Grotesque", sans-serif; }
+.payment span { color: var(--ink-2); }
+.scene[data-step="1"] .payment, .scene[data-step="2"] .payment { opacity: 1; transform: none; }
+.scene[data-step="3"] .payment { opacity: .5; transform: none; }
+.door { grid-row: span 2; width: 200px; height: 300px; border-radius: 100px 100px 10px 10px; background: var(--door); box-shadow: inset 0 0 0 8px var(--door-deep); position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 22px; color: #fff; }
+@media (max-width: 520px) { .door { grid-row: auto; justify-self: center; } }
+.door .bulb { width: 14px; height: 14px; border-radius: 50%; background: #75818F; transition: background .4s, box-shadow .4s; }
+.scene[data-step="2"] .bulb { background: var(--brass); box-shadow: 0 0 0 5px rgba(181,133,47,.28), 0 0 22px 6px rgba(214,166,77,.5); }
+.scene[data-step="3"] .bulb { background: #5BC48F; box-shadow: 0 0 0 5px rgba(91,196,143,.25), 0 0 22px 6px rgba(91,196,143,.45); }
+.door .state { margin-top: 10px; font-size: 13px; color: rgba(255,255,255,.88); min-height: 20px; text-align: center; padding: 0 12px; }
+.door .slot { margin-top: auto; margin-bottom: 26px; width: 150px; background: var(--door-deep); border-radius: 8px; padding: 9px 10px; font: 400 12px/1.4 "JetBrains Mono", monospace; color: #fff; text-align: center; }
+.door .slot small { display: block; font: 500 11px "Instrument Sans", sans-serif; color: rgba(255,255,255,.7); margin-bottom: 2px; }
+.door .knob { position: absolute; right: 22px; top: 56%; width: 14px; height: 14px; border-radius: 50%; background: var(--brass); }
+.vault { align-self: end; justify-self: start; width: 100%; max-width: 260px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--fog); font-size: 14px; }
+.vault h4 { margin: 0 0 8px; font: 600 15px "Instrument Sans", sans-serif; }
+.vault .row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.vault .row:first-of-type { border-top: 0; }
+.vault .credit { color: var(--landed); font-weight: 600; opacity: 0; transition: opacity .5s .25s; }
+.scene[data-step="3"] .vault .credit { opacity: 1; }
+.vault .muted { color: var(--ink-2); }
+.replay { position: absolute; left: 28px; bottom: 18px; font: 500 14px "Instrument Sans", sans-serif; background: none; border: 0; color: var(--door); cursor: pointer; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 520px) { .replay { position: static; } }
+
+/* problem */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 44px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--sheet); }
+@media (max-width: 760px) { .compare { grid-template-columns: 1fr; } }
+.compare > div { padding: 30px; }
+.compare > div + div { border-left: 1px solid var(--line); }
+@media (max-width: 760px) { .compare > div + div { border-left: 0; border-top: 1px solid var(--line); } }
+.compare h3 { margin-bottom: 18px; }
+.lane { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; }
+.lane .node { border: 1px solid var(--line); background: var(--fog); border-radius: 999px; padding: 6px 12px; }
+.lane .to { color: var(--ink-2); }
+.lane .result { font-weight: 600; }
+.lane .result.no { color: var(--back); }
+.lane .result.yes { color: var(--landed); }
+.compare p { color: var(--ink-2); margin-top: 16px; font-size: 15px; }
+
+/* steps */
+ol.steps { list-style: none; margin: 48px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; counter-reset: s; }
+@media (max-width: 920px) { ol.steps { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { ol.steps { grid-template-columns: 1fr; } }
+ol.steps li { counter-increment: s; border-top: 3px solid var(--door); padding-top: 18px; }
+ol.steps li::before { content: counter(s); display: block; font: 800 34px/1 "Bricolage Grotesque", sans-serif; color: var(--door); margin-bottom: 14px; }
+ol.steps li:last-child { border-top-color: var(--back); }
+ol.steps li:last-child::before { color: var(--back); }
+ol.steps p { color: var(--ink-2); margin-top: 8px; font-size: 15.5px; }
+
+/* integrate */
+.integrate { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 56px; align-items: start; margin-top: 8px; }
+@media (max-width: 920px) { .integrate { grid-template-columns: 1fr; } }
+.integrate .points { margin-top: 26px; display: grid; gap: 16px; font-size: 15.5px; }
+.integrate .points p { color: var(--ink-2); }
+.integrate .points b { color: var(--ink); }
+.code { background: var(--code-bg); border-radius: 16px; overflow: hidden; }
+.tabs { display: flex; gap: 4px; padding: 10px 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.tabs button { background: none; border: 0; color: rgba(227,234,242,.65); font: 500 14px "Instrument Sans", sans-serif; padding: 10px 14px; border-radius: 8px 8px 0 0; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: #fff; background: rgba(255,255,255,.07); }
+.code pre { margin: 0; padding: 22px; overflow-x: auto; font: 400 13.5px/1.65 "JetBrains Mono", monospace; color: var(--code-ink); min-height: 330px; }
+.code .c { color: #7F93AA; } .code .s { color: #E3C17A; } .code .k { color: #8FC1EE; }
+.code .bar { display: flex; justify-content: flex-end; padding: 0 12px 12px; }
+.code .copy { background: rgba(255,255,255,.08); border: 0; color: #fff; font: 500 13px "Instrument Sans", sans-serif; padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+
+/* included */
+dl.included { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px 48px; margin: 48px 0 0; }
+@media (max-width: 920px) { dl.included { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { dl.included { grid-template-columns: 1fr; } }
+dl.included dt { font: 600 19px "Bricolage Grotesque", sans-serif; letter-spacing: -0.01em; }
+dl.included dd { margin: 8px 0 0; color: var(--ink-2); font-size: 15.5px; }
+
+/* arc table */
+table.arc { width: 100%; border-collapse: collapse; margin-top: 40px; font-size: 16px; }
+table.arc th, table.arc td { text-align: left; padding: 18px 16px 18px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.arc th { width: 34%; font: 600 17px "Bricolage Grotesque", sans-serif; }
+table.arc td { color: var(--ink-2); }
+@media (max-width: 640px) { table.arc th, table.arc td { display: block; width: 100%; padding: 6px 0; border: 0; } table.arc tr { display: block; padding: 14px 0; border-bottom: 1px solid var(--line); } }
+
+/* proof */
+.proof { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 44px; }
+@media (max-width: 920px) { .proof { grid-template-columns: 1fr; } }
+.feed { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.feed li { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.feed .amt { font: 600 18px "Bricolage Grotesque", sans-serif; }
+.feed .what { color: var(--ink-2); }
+.feed .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--landed); display: inline-block; }
+.feed .dot.back { background: var(--back); }
+.feed .empty { display: block; color: var(--ink-2); }
+.facts { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.facts div { display: grid; grid-template-columns: 170px 1fr; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+@media (max-width: 520px) { .facts div { grid-template-columns: 1fr; gap: 2px; } }
+.facts dt { color: var(--ink-2); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.mono { font: 400 13.5px "JetBrains Mono", monospace; }
+.proof h3 { margin-bottom: 16px; }
+
+/* safety */
+.safety { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 48px; margin-top: 40px; }
+@media (max-width: 760px) { .safety { grid-template-columns: 1fr; } }
+.safety p { color: var(--ink-2); font-size: 15.5px; margin-top: 6px; }
+.safety .warn h3 { color: var(--back); }
+
+/* faq */
+.faq { margin-top: 36px; max-width: 820px; }
+.faq details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+.faq summary { cursor: pointer; font: 600 18px "Bricolage Grotesque", sans-serif; letter-spacing: -0.01em; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--door); font-weight: 400; font-size: 24px; line-height: 1; }
+.faq details[open] summary::after { content: "−"; }
+.faq details p { color: var(--ink-2); margin-top: 12px; max-width: 70ch; }
+
+/* closing + footer */
+.closing { background: var(--door); color: #fff; border-radius: 26px; padding: 56px; display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center; }
+@media (max-width: 760px) { .closing { grid-template-columns: 1fr; padding: 36px 28px; } }
+.closing h2 { color: #fff; max-width: 20ch; }
+.closing p { color: rgba(255,255,255,.82); margin-top: 12px; max-width: 52ch; }
+.closing .btn.solid { background: #fff; color: var(--door); border-color: #fff; }
+.closing .btn.line { color: #fff; border-color: rgba(255,255,255,.6); }
+.closing .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+footer { padding: 56px 0 64px; font-size: 14.5px; color: var(--ink-2); }
+footer .cols { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; }
+@media (max-width: 760px) { footer .cols { grid-template-columns: 1fr 1fr; } }
+footer h4 { font: 600 15px "Instrument Sans", sans-serif; color: var(--ink); margin: 0 0 10px; }
+footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+footer a { color: var(--ink-2); text-decoration: none; }
+footer a:hover { color: var(--ink); text-decoration: underline; }
+footer .legal { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<header class="nav" id="top">
+  <div class="wrap">
+    <a class="mark" href="./" aria-label="Doorstep home">
+      <svg viewBox="0 0 22 28" aria-hidden="true"><path d="M1 27V11a10 10 0 0 1 20 0v16z" fill="var(--door)"/><circle cx="15.5" cy="17" r="1.6" fill="var(--brass)"/></svg>
+      Doorstep
+    </a>
+    <nav class="links" aria-label="Main">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#developers">Developers</a>
+      <a class="hide-sm" href="#proof">Proof</a>
+      <a class="hide-sm" href="#faq">FAQ</a>
+      <a class="hide-sm" id="nav-github" href="https://github.com/phoenix-2203/doorstep">GitHub</a>
+      <a class="btn solid" href="app/">Try it</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <h1>Let people pay into your Arc app from any wallet or exchange.</h1>
+        <p class="lead">On Arc, pressing Send in a wallet can't reach a savings vault, an escrow or a checkout contract. Doorstep gives each payer an address. The USDC that arrives there is deposited into your contract for the right person within seconds, or sent back.</p>
+        <div class="ctas">
+          <a class="btn solid" href="app/">Try it with real USDC</a>
+          <a class="btn line" href="#developers">Integrate it</a>
+        </div>
+        <p class="fine">Live on Arc mainnet. Open source. No sign-up for payers.</p>
+      </div>
+
+      <div class="scene" id="scene" data-step="0" aria-label="A payment from an exchange arrives at a Doorstep address and is deposited into a savings vault" role="img">
+        <div class="payment"><span>Withdrawal from Coinbase</span><b>25 USDC</b><span>to 0x6d97…0d58 on Arc</span></div>
+        <div class="door">
+          <span class="bulb"></span>
+          <span class="state" id="scene-state">Waiting for payment</span>
+          <div class="slot"><small>Ada's Doorstep address</small>0x6d97…0d58</div>
+          <span class="knob"></span>
+        </div>
+        <div class="vault">
+          <h4>Savings vault</h4>
+          <div class="row"><span>Ada</span><span><span class="credit">+24.996 USDC</span></span></div>
+          <div class="row muted"><span>Network fee</span><span class="credit muted" style="color:inherit">0.004 USDC</span></div>
+          <div class="row muted"><span>Doorstep keeps</span><span>nothing</span></div>
+        </div>
+        <button class="replay" id="replay" type="button">Play again</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="problem">
+    <div class="wrap">
+      <h2>A wallet's Send button can't reach your contract.</h2>
+      <p class="lead">On Arc, USDC is the native coin. Wallets and exchanges send it as a plain transfer. Vaults, escrows and checkouts only accept money through their own deposit function, so a plain transfer to them fails.</p>
+      <div class="compare">
+        <div>
+          <h3>Without Doorstep</h3>
+          <div class="lane"><span class="node">Wallet or exchange</span><span class="to">sends to</span><span class="node">Your vault</span><span class="result no">Reverted</span></div>
+          <p>This happened on Arc mainnet on 2 October 2026: a wallet payment into an onramp's escrow failed, and the team had to fund it from a backend script (<a href="https://github.com/BreadchainCoop/curacao-crypto-onramp-bot/issues/48">issue #48</a>).</p>
+        </div>
+        <div>
+          <h3>With Doorstep</h3>
+          <div class="lane"><span class="node">Wallet or exchange</span><span class="to">sends to</span><span class="node">Doorstep address</span><span class="to">delivered into</span><span class="node">Your vault</span><span class="result yes">Credited</span></div>
+          <p>Your contract doesn't change. Payers don't connect anything. They send USDC on Arc to an address, as they already know how to.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <div class="wrap">
+      <h2>How a payment gets in.</h2>
+      <ol class="steps">
+        <li><h3>You create an address</h3><p>It's calculated from its instructions: which contract, who gets credited, where refunds go, and until when. Nothing is deployed, and anyone can recompute it to check.</p></li>
+        <li><h3>They pay from anywhere</h3><p>A wallet's Send button, an exchange withdrawal or an ERC-20 transfer. On Arc these all land in the same USDC balance.</p></li>
+        <li><h3>It's delivered automatically</h3><p>A delivery bot calls your contract's deposit function within seconds. Its network fee, usually under $0.01, comes out of the payment.</p></li>
+        <li><h3>Or it goes back</h3><p>If your contract refuses it, or it arrives after the deadline, it's returned to the refund wallet. That wallet can also cancel at any time.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band" id="developers">
+    <div class="wrap">
+      <div class="integrate">
+        <div>
+          <h2>A few lines, or one HTTPS call.</h2>
+          <p class="lead">Use the JavaScript SDK in your app, or the hosted API from any backend. Both give you the address, a ready pay page and the payment's status.</p>
+          <div class="points">
+            <p><b>No custody.</b> Doorstep never holds funds between transactions. The money can only go to your contract or back to the refund wallet.</p>
+            <p><b>Works with your contract as it is.</b> Anything with <code>deposit(uint256 amount, address to)</code> that pulls with <code>transferFrom</code>, which includes every ERC-4626 vault. Other functions work too.</p>
+            <p><b>Know when it lands.</b> Signed webhooks for delivered and returned payments, retried for two hours.</p>
+          </div>
+          <div class="ctas" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:28px">
+            <a class="btn solid" id="api-docs" href="https://api.104-251-218-80.sslip.io/docs">API reference</a>
+            <a class="btn line" href="https://github.com/phoenix-2203/doorstep/tree/main/sdk">SDK guide</a>
+          </div>
+        </div>
+        <div class="code">
+          <div class="tabs" role="tablist" aria-label="Code examples">
+            <button role="tab" aria-selected="true" aria-controls="code-sdk" id="tab-sdk">JavaScript SDK</button>
+            <button role="tab" aria-selected="false" aria-controls="code-api" id="tab-api">HTTP API</button>
+            <button role="tab" aria-selected="false" aria-controls="code-hook" id="tab-hook">Webhook</button>
+          </div>
+<pre id="code-sdk" role="tabpanel" aria-labelledby="tab-sdk"><span class="k">import</span> { createDoorstep } <span class="k">from</span> <span class="s">'doorstep-arc'</span>;
+
+<span class="k">const</span> ds = createDoorstep();            <span class="c">// Arc mainnet</span>
+
+<span class="k">const</span> invoice = ds.depositIntent({
+  into: <span class="s">'0xYourVault'</span>,                <span class="c">// deposit(amount, to)</span>
+  beneficiary: customer,              <span class="c">// who gets credited</span>
+  refundTo: customer,                 <span class="c">// if it can't be delivered</span>
+  minimum: <span class="s">'25'</span>,
+  expires: <span class="s">'7d'</span>,
+  reference: <span class="s">'inv-1042'</span>,
+});
+
+ds.depositAddress(invoice);           <span class="c">// show it, or a QR code</span>
+ds.toLink(invoice, { amount: <span class="s">'25'</span> });  <span class="c">// a ready pay page</span>
+ds.watch(invoice, (e) => {            <span class="c">// waiting, landed, bounced</span>
+  <span class="k">if</span> (e.type === <span class="s">'landed'</span>) markPaid(<span class="s">'inv-1042'</span>);
+});</pre>
+<pre id="code-api" role="tabpanel" aria-labelledby="tab-api" hidden>curl -X POST <span class="s" data-api>https://api.104-251-218-80.sslip.io</span>/v1/addresses \
+  -H <span class="s">"Authorization: Bearer $DOORSTEP_KEY"</span> \
+  -H <span class="s">"content-type: application/json"</span> \
+  -d <span class="s">'{
+    "into": "0xYourVault",
+    "beneficiary": "0xCustomer",
+    "refundTo": "0xCustomer",
+    "amount": "25",
+    "reference": "inv-1042",
+    "webhookUrl": "https://yourapp.com/hooks/doorstep"
+  }'</span>
+
+<span class="c"># 201 Created</span>
+{
+  <span class="s">"address"</span>: <span class="s">"0x6d97…0d58"</span>,
+  <span class="s">"payLink"</span>: <span class="s">"https://…/app/#i=…"</span>,
+  <span class="s">"registered"</span>: true,
+  <span class="s">"invoice"</span>: { <span class="s">"state"</span>: <span class="s">"unpaid"</span>, <span class="s">"remaining"</span>: <span class="s">"25"</span> }
+}</pre>
+<pre id="code-hook" role="tabpanel" aria-labelledby="tab-hook" hidden><span class="c">// POST to your webhookUrl when a payment lands</span>
+<span class="k">import</span> crypto <span class="k">from</span> <span class="s">'node:crypto'</span>;
+
+app.post(<span class="s">'/hooks/doorstep'</span>, express.raw({ type: <span class="s">'*/*'</span> }), (req, res) => {
+  <span class="k">const</span> ts = req.get(<span class="s">'x-doorstep-timestamp'</span>);
+  <span class="k">const</span> expected = <span class="s">'v1='</span> + crypto
+    .createHmac(<span class="s">'sha256'</span>, process.env.DOORSTEP_WEBHOOK_SECRET)
+    .update(`${ts}.${req.body}`).digest(<span class="s">'hex'</span>);
+  <span class="k">if</span> (req.get(<span class="s">'x-doorstep-signature'</span>) !== expected) <span class="k">return</span> res.sendStatus(<span class="s">401</span>);
+
+  <span class="k">const</span> event = JSON.parse(req.body);
+  <span class="c">// { type: 'payment.delivered', data: { reference: 'inv-1042', amount: '24.996', txUrl } }</span>
+  <span class="k">if</span> (event.type === <span class="s">'payment.delivered'</span>) markPaid(event.data.reference);
+  res.sendStatus(<span class="s">200</span>);
+});</pre>
+          <div class="bar"><button class="copy" type="button" id="copy">Copy</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="included">
+    <div class="wrap">
+      <h2>Everything a payment needs, end to end.</h2>
+      <dl class="included">
+        <div><dt>JavaScript SDK</dt><dd>Build addresses offline, describe them to payers in plain words, watch their status, deliver or cancel.</dd></div>
+        <div><dt>Hosted API</dt><dd>One HTTPS call returns an address and a pay page, registered for automatic delivery. API keys and rate limits included.</dd></div>
+        <div><dt>Webhooks</dt><dd>A signed notice when a payment is delivered or returned, with retries for two hours.</dd></div>
+        <div><dt>Invoices</dt><dd>Ask for an exact amount. Part payments are tracked, and nothing is delivered until all of it is there.</dd></div>
+        <div><dt>Pay pages</dt><dd>A QR code, live status and a Deliver button anyone can press, at a link you can send to anyone.</dd></div>
+        <div><dt>Delivery bot</dt><dd>Public and always on, repaid from each payment. It only delivers what repays its gas, and anyone can run another.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band" id="arc">
+    <div class="wrap">
+      <h2>Built on what makes Arc different.</h2>
+      <table class="arc">
+        <tr><th>Gas is paid in USDC</th><td>The delivery bot is repaid in the same coin it spent, by simple arithmetic. No price oracle, no swaps, no float to manage.</td></tr>
+        <tr><th>One balance, two interfaces</th><td>Native sends and ERC-20 transfers both arrive in the same balance, so a single sweep handles both.</td></tr>
+        <tr><th>Native USDC moves with SELFDESTRUCT</th><td>An 8-byte contract created and destroyed in one transaction is the entire sweep. The address is empty again afterwards and can be paid again, even by exchanges that send with a fixed gas limit.</td></tr>
+        <tr><th>Fast finality, fees under a cent</th><td>Credit is final as soon as the delivery is included, and small payments are still worth delivering.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="band" id="proof">
+    <div class="wrap">
+      <h2>Running on Arc mainnet today.</h2>
+      <p class="lead">Every number below comes from the chain or the test suite, and every transaction is linked so you can check it yourself.</p>
+      <div class="proof">
+        <div>
+          <h3>Latest deliveries</h3>
+          <ul class="feed" id="feed"><li><span class="empty">Reading Arc mainnet…</span></li></ul>
+        </div>
+        <div>
+          <h3>Contracts and checks</h3>
+          <dl class="facts">
+            <div><dt>Doorstep</dt><dd><a class="mono" id="doorstep-link" href="https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229">0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229</a></dd></div>
+            <div><dt>Demo savings vault</dt><dd><a class="mono" href="https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3">0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3</a></dd></div>
+            <div><dt>Contract tests</dt><dd>32 pass under Arc's rules, and against live mainnet state</dd></div>
+            <div><dt>SDK and API tests</dt><dd>15 offline, plus end-to-end runs on a local Arc node</dd></div>
+            <div><dt>Every flow on mainnet</dt><dd>Wallet send, ERC-20 transfer, reused address, expiry refund, early cancel, automatic delivery. <a href="https://github.com/phoenix-2203/doorstep#mainnet-proof">See the transactions</a></dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="safety">
+    <div class="wrap">
+      <h2>Where the money can go, and where it can't.</h2>
+      <div class="safety">
+        <div><h3>Only two destinations</h3><p>A payment can only be delivered into the contract in its instructions, or returned to its refund wallet. Not to Doorstep, not to the delivery bot, not to anyone else.</p></div>
+        <div><h3>Nothing can be redirected</h3><p>The address is calculated from the instructions. Change one word and you get a different address, so a handed-out address always does what it says.</p></div>
+        <div><h3>The payer is protected</h3><p>Payments that can't be delivered, or arrive after the deadline, go back automatically. The refund wallet can also take them back early.</p></div>
+        <div class="warn"><h3>Not audited yet</h3><p>Doorstep is new and hasn't had a security audit. The code and tests are public. Use small amounts until it has been reviewed.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="faq">
+    <div class="wrap">
+      <h2>Questions people ask.</h2>
+      <div class="faq">
+        <details><summary>Which wallets and exchanges work?</summary><p>Anything that can send USDC on the Arc network: browser and mobile wallets, and exchange withdrawals that support Arc. The payer chooses Arc as the network and pastes the address. No app to connect.</p></details>
+        <details><summary>What does it cost?</summary><p>There's no Doorstep fee. Each delivery pays its own network fee out of the payment, usually under $0.01 and never more than the limit set in the address's instructions. Any unused part of that allowance goes back to the refund wallet.</p></details>
+        <details><summary>What if someone pays too little or too much?</summary><p>If an address has a minimum or an exact amount, smaller payments wait there until the total is reached; the refund wallet can cancel in the meantime. Anything above the amount is delivered too.</p></details>
+        <details><summary>Who holds the money while it's waiting?</summary><p>Nobody. It sits at the payer's Doorstep address until it's delivered or returned. Doorstep itself holds nothing between transactions.</p></details>
+        <details><summary>What if the delivery bot is offline?</summary><p>Payments wait safely at their address. Anyone can deliver them, including the payer, with one click on the pay page, and the fee comes out of the payment.</p></details>
+        <details><summary>Does my contract need changes?</summary><p>No, as long as it has <code>deposit(uint256 amount, address to)</code> and takes the funds with <code>transferFrom</code>. Every ERC-4626 vault already does. For other functions, put the amount wherever your function expects it.</p></details>
+        <details><summary>What if someone sends a token other than USDC?</summary><p>Doorstep only moves USDC. Other tokens sent to an address can't be delivered or returned by Doorstep, so pay pages say "USDC on the Arc network only".</p></details>
+        <details><summary>Is it audited?</summary><p>Not yet. The contract is about 370 lines, open source, with 32 tests that also run against live mainnet state. An audit is the first thing a grant would pay for.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" style="border-top:0;padding-top:0">
+    <div class="wrap">
+      <div class="closing">
+        <div>
+          <h2>See a payment arrive in under a minute.</h2>
+          <p>Get your own Doorstep address on Arc mainnet, send a few cents of USDC from any wallet, and watch it land in a savings vault you can withdraw from.</p>
+        </div>
+        <div class="ctas">
+          <a class="btn solid" href="app/">Try it with real USDC</a>
+          <a class="btn line" href="#developers">Integrate it</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="mark" href="./"><svg viewBox="0 0 22 28" aria-hidden="true"><path d="M1 27V11a10 10 0 0 1 20 0v16z" fill="var(--door)"/><circle cx="15.5" cy="17" r="1.6" fill="var(--brass)"/></svg>Doorstep</a>
+        <p style="margin-top:12px;max-width:34ch">Payments into Arc contracts from any wallet or exchange.</p>
+      </div>
+      <div><h4>Product</h4><ul><li><a href="app/">Try it</a></li><li><a href="app/#developers">Make a payment link</a></li><li><a href="#how">How it works</a></li><li><a href="#faq">FAQ</a></li></ul></div>
+      <div><h4>Developers</h4><ul><li><a class="api-link" href="https://api.104-251-218-80.sslip.io/docs">API reference</a></li><li><a href="https://github.com/phoenix-2203/doorstep/tree/main/sdk">SDK</a></li><li><a href="https://github.com/phoenix-2203/doorstep/tree/main/keeper">Run a delivery bot</a></li><li><a href="https://github.com/phoenix-2203/doorstep">Source code</a></li></ul></div>
+      <div><h4>Proof</h4><ul><li><a href="https://github.com/phoenix-2203/doorstep#mainnet-proof">Mainnet transactions</a></li><li><a href="https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229">Doorstep on the explorer</a></li><li><a href="https://github.com/phoenix-2203/doorstep#what-has-been-verified">What's been tested</a></li></ul></div>
+    </div>
+    <p class="legal">Open source under the MIT licence. Not audited: use small amounts. Built on Arc.</p>
+  </div>
+</footer>
+<script type="module" src="./landing.js"></script>
+</body>
+</html>
