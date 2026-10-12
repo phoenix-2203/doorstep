@@ -21,7 +21,7 @@ cd keeper
 cp .env.example .env
 ```
 
-Edit `.env`: set `DOORSTEP` and `FROM_BLOCK` to the deployment you deliver for, and `KEEPER_KEYSTORE` to the keystore from step 1.
+Edit `.env`: set `RPC_URL` to your own endpoint (the public one rate-limits a bot that runs all day), `DOORSTEP` and `FROM_BLOCK` to the deployment you deliver for, and `KEEPER_KEYSTORE` to the keystore from step 1. `.env` is git-ignored; keep it private.
 
 ## 3. Run it on your Mac
 
@@ -62,6 +62,6 @@ Stop it with Ctrl+C.
 | `KEEPER_PASSWORD_FILE` | Password file for unattended runs; empty means "ask at start" |
 | `KEEPER_PRIVATE_KEY` | Alternative to a keystore, for throwaway wallets only |
 | `POLL_MS` | How often it checks, in milliseconds (default 2000) |
-| `STATE_FILE` | Where it remembers registered addresses (default `keeper-state.json`) |
+| `STATE_FILE` | Where it remembers registered addresses (default `keeper-state-<contract>.json`, one per Doorstep contract) |
 
 With no wallet configured it runs read-only and prints what it would deliver.
