@@ -77,12 +77,25 @@ const revive = (i) => ({
 
 // ---------------------------------------------------------------- discovery
 
+// Arc's public RPC refuses some eth_getLogs ranges ("Request exceeds defined limit"), so the span
+// shrinks on refusal and grows back after successes.
+let span = LOG_SPAN;
+const MIN_SPAN = 50n;
+const isRangeLimit = (e) => /limit|range|too many|exceed|too large|response size/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+
 async function scan() {
-  const head = await pub.getBlockNumber();
+  const head = await pub.getBlockNumber({ cacheTime: 0 });
   let from = BigInt(state.cursor);
   while (from <= head) {
-    const to = from + LOG_SPAN - 1n < head ? from + LOG_SPAN - 1n : head;
-    const logs = await pub.getContractEvents({ address: DOORSTEP, abi, eventName: 'Announced', fromBlock: from, toBlock: to });
+    const to = from + span - 1n < head ? from + span - 1n : head;
+    let logs;
+    try {
+      logs = await pub.getContractEvents({ address: DOORSTEP, abi, eventName: 'Announced', fromBlock: from, toBlock: to });
+    } catch (e) {
+      if (!isRangeLimit(e) || span <= MIN_SPAN) throw e;
+      span = span / 2n < MIN_SPAN ? MIN_SPAN : span / 2n;
+      continue;
+    }
     for (const log of logs) {
       const { intentHash, depositAddress, intent } = log.args;
       if (!state.intents[intentHash]) {
@@ -93,6 +106,7 @@ async function scan() {
     state.cursor = (to + 1n).toString();
     save();
     from = to + 1n;
+    if (span < LOG_SPAN) span = span * 2n > LOG_SPAN ? LOG_SPAN : span * 2n;
   }
 }
 
