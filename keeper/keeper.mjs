@@ -93,9 +93,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isLimit = (e) => e?.code === -32005 || /limit|range|too many|exceed|too large|response size|rate/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
 const rpcReason = (e) => (e?.details || e?.cause?.details || e?.shortMessage || e?.message || String(e)).toString().split('\n')[0];
 
+let lastProgress = 0;
 async function scan() {
   const head = await pub.getBlockNumber({ cacheTime: 0 });
   let from = BigInt(state.cursor);
+  const behind = head - from;
+  if (behind > 2000n) console.log(`[sync] catching up on ${behind} blocks (${from} -> ${head}), ${span} blocks per search…`);
   while (from <= head) {
     const to = from + span - 1n < head ? from + span - 1n : head;
     let logs;
@@ -128,8 +131,14 @@ async function scan() {
     state.cursor = (to + 1n).toString();
     save();
     from = to + 1n;
+    if (behind > 2000n && Date.now() - lastProgress > 15_000) {
+      lastProgress = Date.now();
+      const done = Number(((from - (head - behind)) * 1000n) / (behind || 1n)) / 10;
+      console.log(`[sync] ${done.toFixed(1)}% (block ${from} of ${head})`);
+    }
     if (span < maxSpan) span = span * 2n > maxSpan ? maxSpan : span * 2n;
   }
+  if (behind > 2000n) console.log(`[sync] caught up at block ${head}. Watching for payments.`);
 }
 
 // ---------------------------------------------------------------- landing
