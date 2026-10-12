@@ -10,3 +10,6 @@ broadcast/*/dry-run/
 *.zip
 .DS_Store
 sdk/node_modules/
+api/.env
+api/data/
+api/node_modules/

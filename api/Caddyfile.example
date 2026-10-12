@@ -1,0 +1,6 @@
+# /etc/caddy/Caddyfile — HTTPS for the Doorstep API with a free hostname.
+# Replace 203-0-113-10 with your VPS IP, dots turned into dashes. Caddy gets the certificate itself.
+api.203-0-113-10.sslip.io {
+	encode gzip
+	reverse_proxy 127.0.0.1:8787
+}

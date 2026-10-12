@@ -1,0 +1,21 @@
+# systemd unit for the Doorstep hosted API (runs next to the delivery bot).
+#   sudo cp doorstep-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now doorstep-api
+#   journalctl -u doorstep-api -f
+[Unit]
+Description=Doorstep hosted API (Arc)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=doorstep
+WorkingDirectory=/home/doorstep/doorstep/api
+ExecStart=/usr/bin/env node server.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
