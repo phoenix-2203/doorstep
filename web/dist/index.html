@@ -118,55 +118,174 @@ a { color: var(--door); }
 section + section { margin-top: 36px; }
 footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
 [hidden] { display: none !important; }
+
+/* ---- navigation, sections, steps, timeline ---- */
+nav.links { display: flex; gap: 18px; font-size: 14px; flex-wrap: wrap; align-items: baseline; }
+nav.links a { color: var(--ink-2); text-decoration: none; }
+nav.links a:hover, nav.links a[aria-current="page"] { color: var(--ink); text-decoration: underline; }
+.how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 8px 0 48px; padding: 0; list-style: none; counter-reset: how; }
+@media (max-width: 820px) { .how { grid-template-columns: 1fr; } }
+.how li { background: var(--white); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; counter-increment: how; }
+.how li::before { content: counter(how); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--door); color: #fff; font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.how b { display: block; margin-bottom: 4px; }
+.how span { color: var(--ink-2); font-size: 14px; }
+.card { background: var(--white); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.step { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.step:last-child { border-bottom: 0; }
+.step .n { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.step.done .n { background: var(--landed); border-color: var(--landed); color: #fff; }
+.step.now .n { border-color: var(--door); color: var(--door); }
+.step h3 { margin: 2px 0 4px; font-size: 16px; }
+.step p { margin: 0 0 10px; color: var(--ink-2); font-size: 14px; }
+.big { font: 700 30px/1.1 "Bricolage Grotesque", sans-serif; }
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { position: relative; padding: 0 0 16px 28px; color: var(--ink-2); font-size: 15px; }
+.timeline li::before { content: ""; position: absolute; left: 6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--line); background: var(--paper); }
+.timeline li::after { content: ""; position: absolute; left: 11px; top: 20px; bottom: 0; width: 2px; background: var(--line); }
+.timeline li:last-child::after { display: none; }
+.timeline li.done { color: var(--ink); }
+.timeline li.done::before { background: var(--landed); border-color: var(--landed); }
+.timeline li.now { color: var(--ink); font-weight: 600; }
+.timeline li.now::before { border-color: var(--brass); background: var(--brass); }
+.timeline li.bad::before { background: var(--bounced); border-color: var(--bounced); }
+.timeline small { display: block; font-weight: 400; color: var(--ink-2); font-size: 13px; }
+.warn { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+details { border-top: 1px solid var(--line); padding: 12px 0; }
+details summary { cursor: pointer; font-weight: 600; }
+details[open] summary { margin-bottom: 10px; }
+pre.code { background: #0F141B; color: #E7EBEF; border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: 400 13px/1.55 "JetBrains Mono", ui-monospace, monospace; }
+.pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--paper-2); color: var(--ink-2); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
     <p class="brand"><a href="./">Doorstep</a></p>
-    <span class="net" id="net">Arc</span>
+    <nav class="links" aria-label="Main">
+      <a href="./" id="nav-home">Try it</a>
+      <a href="#developers" id="nav-dev">For developers</a>
+      <a href="https://github.com/phoenix-2203/doorstep" target="_blank" rel="noopener">GitHub</a>
+      <span class="net" id="net">Arc</span>
+    </nav>
   </header>
 
-  <!-- Create view -->
-  <div id="create-view">
-    <p class="lede">Get paid into a contract from any wallet, exchange or bridge.</p>
-    <p class="sub">Doorstep gives you an address. Whatever USDC lands there is deposited into the contract you choose, credited to the person you choose, or sent back if it can't be. The sender just presses Send.</p>
+  <!-- ============================== Home: pitch + try it ============================== -->
+  <div id="home-view" hidden>
+    <p class="lede">Let people pay into your Arc app from any wallet or exchange.</p>
+    <p class="sub">On Arc, pressing "Send USDC" in a wallet can't pay into most apps: savings vaults, escrows and checkouts only accept money through their own deposit button. Doorstep gives each payer an address. Whatever arrives there is put into the app for them automatically, or sent back if that isn't possible.</p>
+
+    <ol class="how">
+      <li><b>Send to an address</b><span>From any wallet, or straight from an exchange like Coinbase or Binance. No app to connect, no buttons to find.</span></li>
+      <li><b>Delivered automatically</b><span>Doorstep puts the money into the app within seconds, credited to the right person. The small network fee (under $0.01) comes out of the payment.</span></li>
+      <li><b>Or sent back</b><span>If it can't be delivered, it goes back. Nobody can redirect it: the address is calculated from its instructions.</span></li>
+    </ol>
+
     <div class="stage">
-      <div class="door" id="door-create" data-state="idle" aria-live="polite">
-        <span class="light"><span class="bulb"></span><span>Fill in the form to get an address</span></span>
-        <div class="qr"><span class="empty">The address appears here</span></div>
+      <div class="door" id="door-home" data-state="idle" aria-live="polite">
+        <span class="light"><span class="bulb"></span><span id="home-light">Connect your wallet to start</span></span>
+        <div class="qr" id="home-qr"><span class="empty">Your savings address appears here</span></div>
+        <div class="slot" id="home-slot" hidden><div class="k">Your savings address on Arc</div><div class="addr" id="home-addr"></div></div>
+        <div class="say">Send USDC on the Arc network only.</div>
         <div class="knob" aria-hidden="true"></div>
       </div>
-      <section>
-        <h2>Set up your payment address</h2>
-        <p class="intro">Answer these and you get an address. Anyone who sends USDC on Arc to it pays into the contract you pick. These answers are the address's <i>instructions</i>; nobody can change them later.</p>
+      <section class="card" aria-labelledby="try-title">
+        <h2 id="try-title">Try it: a savings vault you can top up from anywhere</h2>
+        <p class="note" style="margin-top:0">This demo app is a simple savings vault on Arc mainnet. Your wallet can't send to it directly. Doorstep gives you your own address that can. Uses real USDC; try a small amount.</p>
+
+        <div class="step" id="s1">
+          <div class="n">1</div>
+          <div><h3>Connect your wallet</h3><p>This is the account your savings belong to.</p>
+            <div class="actions"><button type="button" id="btn-connect">Connect wallet</button></div>
+            <p class="msg" id="s1-msg" role="status"></p></div>
+        </div>
+        <div class="step" id="s2">
+          <div class="n">2</div>
+          <div><h3>Get your savings address</h3><p>One confirmation in your wallet (costs under $0.01). It registers your address so payments are delivered automatically. You only do this once; it's the same address every time.</p>
+            <div class="actions"><button type="button" id="btn-create" disabled>Get my address</button></div>
+            <p class="msg" id="s2-msg" role="status"></p></div>
+        </div>
+        <div class="step" id="s3">
+          <div class="n">3</div>
+          <div><h3>Send USDC to it from anywhere</h3><p>Any amount from 0.01 USDC, from any wallet or an exchange withdrawal on the Arc network. Or use the button.</p>
+            <div class="actions"><button type="button" id="btn-home-pay" disabled>Send from this wallet</button><button type="button" class="quiet" id="btn-home-copy" disabled>Copy address</button></div>
+            <p class="msg" id="s3-msg" role="status"></p></div>
+        </div>
+        <div class="step" id="s4">
+          <div class="n">4</div>
+          <div><h3>See it arrive in your savings</h3>
+            <p id="s4-status">Your balance in the vault updates here within seconds of each payment.</p>
+            <div class="big" id="home-balance">–</div>
+            <div class="actions" style="margin-top:10px"><button type="button" class="quiet" id="btn-home-withdraw" disabled>Withdraw to my wallet</button></div>
+            <p class="msg" id="s4-msg" role="status"></p></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================== Developers ============================== -->
+  <div id="dev-view" hidden>
+    <p class="lede">Accept payments into your contract from any wallet or exchange.</p>
+    <p class="sub">Give each payer a Doorstep address. When USDC lands, Doorstep calls your contract's deposit function with the amount and the person to credit. If the call fails or the time limit passes, the money goes back to the refund address. No backend needed: the address is calculated from the instructions, and anyone can deliver.</p>
+
+    <section>
+      <h2>Install the SDK</h2>
+<pre class="code">npm install doorstep-arc viem</pre>
+<pre class="code">import { createDoorstep } from 'doorstep-arc';
+
+const ds = createDoorstep();               // Arc mainnet
+
+const intent = ds.depositIntent({
+  into: '0xYourVault',                     // has deposit(uint256 amount, address to)
+  beneficiary: customer,                   // who gets credited
+  refundTo: customer,                      // where it goes if it can't be delivered
+  minimum: '1',                            // USDC
+  expires: '30d',
+  reference: 'order-1042',
+});
+
+ds.depositAddress(intent);                 // show this, or a QR code
+ds.describe(intent);                       // one paragraph your payer can read
+ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
+</pre>
+      <p class="note">Your contract must take the deposit with <code>transferFrom</code> (Doorstep approves exactly the amount, then revokes). Any ERC-4626 vault works as-is. Full API: <a href="https://github.com/phoenix-2203/doorstep/tree/main/sdk" target="_blank" rel="noopener">SDK readme</a>.</p>
+    </section>
+
+    <section>
+      <h2>Make a payment link by hand</h2>
+      <p class="intro">For testing: answer these and you get a shareable pay page. Its address delivers into the contract you choose.</p>
+      <div class="stage">
+        <div class="door" id="door-create" data-state="idle" aria-live="polite">
+          <span class="light"><span class="bulb"></span><span>Fill in the form to get an address</span></span>
+          <div class="qr"><span class="empty">The address appears here</span></div>
+          <div class="knob" aria-hidden="true"></div>
+        </div>
+        <section>
         <form id="intent-form">
           <label>1. Which contract should the money go into?
-            <span class="hint">The vault, escrow or app that should receive it. It's filled in with our demo escrow so you can try it.</span>
+            <span class="hint">Your app's vault or escrow. Filled in with the demo savings vault so you can try it.</span>
             <input class="mono" name="target" required pattern="^0x[0-9a-fA-F]{40}$" autocomplete="off">
           </label>
           <label>2. Who should it be credited to?
-            <span class="hint">The account the contract records the payment for, usually your customer or you.</span>
+            <span class="hint">The account your contract records the payment for.</span>
             <input class="mono" name="beneficiary" required pattern="^0x[0-9a-fA-F]{40}$" placeholder="0x…" autocomplete="off">
           </label>
           <label>3. If it can't be delivered, where should it go back to?
-            <span class="hint">A wallet you control. This wallet can also cancel and take the money back at any time. Never an exchange deposit address.</span>
+            <span class="hint">A wallet you control; it can also cancel at any time. Never an exchange deposit address.</span>
             <input class="mono" name="refundTo" required pattern="^0x[0-9a-fA-F]{40}$" placeholder="0x…" autocomplete="off">
           </label>
           <div class="actions"><button type="button" class="quiet" id="btn-mine">Use my wallet for 2 and 3</button></div>
           <div class="row">
             <label>4. Wait until at least this much has arrived (USDC)
-              <span class="hint">Smaller payments wait at the address until the total reaches this. 0 delivers any amount.</span>
+              <span class="hint">0 delivers any amount.</span>
               <input name="min" type="number" step="0.000001" min="0" value="0.05" required>
             </label>
             <label>5. Delivery fee limit (USDC)
-              <span class="hint">Delivering costs a small network fee, usually under $0.01, taken from the payment. This is the most it can ever be.</span>
+              <span class="hint">The network fee for delivering, usually under $0.01, comes out of the payment. This is the most it can be.</span>
               <input name="fee" type="number" step="0.000001" min="0" value="0.01" required>
             </label>
           </div>
           <div class="row">
             <label>6. Stop accepting after
-              <span class="hint">After this, anything still waiting goes back instead of being delivered.</span>
               <select name="expiry">
                 <option value="3600">1 hour</option>
                 <option value="86400" selected>1 day</option>
@@ -174,72 +293,84 @@ footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
                 <option value="2592000">30 days</option>
               </select>
             </label>
-            <label>7. Your reference (optional)
-              <span class="hint">An order or invoice number, shown in the records. Up to 31 characters.</span>
+            <label>7. Reference (optional)
+              <span class="hint">An order or invoice number. Up to 31 characters.</span>
               <input name="ref" maxlength="31" value="order-1">
             </label>
           </div>
           <p class="plain dim" id="plain" aria-live="polite"></p>
-          <div class="actions"><button type="submit">Create my address</button></div>
+          <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="announce" checked style="width:auto"> Register it for automatic delivery (one wallet confirmation, under $0.01)</label>
+          <div class="actions"><button type="submit">Create payment link</button></div>
           <p class="msg" id="create-msg" role="status"></p>
         </form>
-      </section>
-    </div>
+        </section>
+      </div>
+    </section>
+
+    <section>
+      <h2>Contracts on Arc mainnet</h2>
+      <dl class="facts" id="dev-facts"></dl>
+    </section>
   </div>
 
-  <!-- Pay / status view -->
+  <!-- ============================== Pay page ============================== -->
   <div id="pay-view" hidden>
-    <p class="lede" id="pay-lede">Send USDC on Arc to this address.</p>
-    <p class="sub">Use any wallet's Send button or an exchange withdrawal on the Arc network. Once it's delivered, it shows here.</p>
+    <p class="lede" id="pay-lede">Pay with USDC on Arc</p>
+    <p class="sub" id="pay-sub">Send USDC to this address from any wallet, or withdraw to it from an exchange. Choose the <b>Arc</b> network.</p>
     <div class="stage">
       <div class="door" id="door" data-state="idle" aria-live="polite">
-        <span class="light"><span class="bulb"></span><span id="light-text">Waiting for a deposit</span></span>
+        <span class="light"><span class="bulb"></span><span id="light-text">Waiting for payment</span></span>
         <div class="qr" id="qr"></div>
         <div class="amount" id="amount">0<small>USDC waiting</small></div>
-        <div class="slot"><div class="k">Deposit address on Arc</div><div class="addr" id="addr"></div></div>
-        <div class="say" id="say">Only send USDC on the Arc network.</div>
+        <div class="slot"><div class="k">Pay to this address on Arc</div><div class="addr" id="addr"></div></div>
+        <div class="say" id="say">USDC on the Arc network only.</div>
         <div class="knob" aria-hidden="true"></div>
       </div>
       <div>
-        <section>
-          <h2>What this address does</h2>
-          <p class="plain" id="plain-pay"></p>
-          <dl class="facts" id="facts"></dl>
-          <p class="note">This page recomputes the address from these terms itself. If any term changed, the address would change too.</p>
-        </section>
-        <section>
-          <h2>Actions</h2>
-          <div class="actions">
-            <button id="btn-pay" type="button">Send from my wallet</button>
-            <button id="btn-land" class="quiet" type="button">Deliver now</button>
-            <button id="btn-cancel" class="quiet" type="button">Cancel and refund</button>
-            <button id="btn-announce" class="quiet" type="button">Tell delivery bots</button>
-            <button id="btn-copy" class="quiet" type="button">Copy link</button>
-          </div>
-          <p class="note" id="bots"></p>
-          <p class="note"><b>Deliver now</b> moves what's waiting into the contract; anyone can press it, and the network fee comes out of the payment. <b>Cancel and refund</b> works only from the refund wallet.</p>
+        <section class="card">
+          <h2>Status</h2>
+          <ol class="timeline" id="timeline"></ol>
+          <div class="actions"><button id="btn-pay" type="button">Send from my wallet</button><button id="btn-copy" class="quiet" type="button">Copy link</button></div>
           <p class="msg" id="pay-msg" role="status"></p>
-        </section>
-        <section>
-          <h2>History</h2>
-          <ul class="log" id="log"><li>No landings yet.</li></ul>
+          <p class="note" id="limits"></p>
         </section>
         <section id="escrow-box" hidden>
-          <h2>Money held in the demo escrow</h2>
-          <p class="note" style="margin-top:0">Delivered payments don't go to a wallet directly. The escrow holds them and records who they belong to. That person withdraws to their wallet whenever they like.</p>
+          <h2>In the demo savings vault</h2>
           <dl class="facts">
             <div><dt>Belongs to</dt><dd class="mono" id="escrow-owner"></dd></div>
-            <div><dt>Held for them</dt><dd id="credited">0 USDC</dd></div>
+            <div><dt>Balance</dt><dd id="credited">0 USDC</dd></div>
           </dl>
-          <div class="actions" style="margin-top:14px"><button id="btn-withdraw" type="button">Withdraw to my wallet</button></div>
+          <div class="actions" style="margin-top:14px"><button id="btn-withdraw" type="button" class="quiet">Withdraw to my wallet</button></div>
           <p class="msg" id="withdraw-msg" role="status"></p>
+        </section>
+        <section>
+          <details>
+            <summary>What this address does</summary>
+            <p class="plain" id="plain-pay"></p>
+            <dl class="facts" id="facts"></dl>
+            <p class="note">This page recalculates the address from these instructions itself. If anything were changed, the address would be different.</p>
+          </details>
+          <details>
+            <summary>History</summary>
+            <ul class="log" id="log"><li>Nothing yet.</li></ul>
+          </details>
+          <details id="advanced">
+            <summary>Advanced</summary>
+            <p class="note" id="bots" style="margin-top:0"></p>
+            <div class="actions">
+              <button id="btn-land" class="quiet" type="button">Deliver now</button>
+              <button id="btn-announce" class="quiet" type="button">Register for automatic delivery</button>
+              <button id="btn-cancel" class="quiet" type="button">Cancel and refund</button>
+            </div>
+            <p class="note"><b>Deliver now</b> moves what's waiting into the contract (anyone can press it; the network fee comes out of the payment). <b>Cancel and refund</b> works only from the refund wallet.</p>
+          </details>
         </section>
       </div>
     </div>
   </div>
 
-  <footer>Doorstep is unaudited. Use small amounts. Source and tests: <a id="repo-link" href="https://github.com/phoenix-2203/doorstep">repository</a>.</footer>
+  <footer>Doorstep is unaudited and new. Use small amounts. <a href="https://github.com/phoenix-2203/doorstep">Source, tests and mainnet proof</a>.</footer>
 </div>
-<script type="module" src="./app-L7YJT3FX.js"></script>
+<script type="module" src="./app-HDFFG2WQ.js"></script>
 </body>
 </html>
