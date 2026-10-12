@@ -132,3 +132,25 @@ test('scanLogs shrinks the range when the RPC refuses it, and covers every block
   assert.ok(out.length > 0);
   await assert.rejects(scanLogs(async () => { throw new Error('boom'); }, 0n, 10n), /boom/);
 });
+
+test('fixed-amount links carry the amount without changing the address', async () => {
+  const { paymentState } = await import('../src/index.js');
+  const i = depositIntent({ into: T, beneficiary: A, refundTo: R, minimum: '25', expires: 1900000000, reference: 'inv-9' });
+  const plain = parseLink(toLink(i));
+  const fixed = parseLink(toLink(i, { amount: '25' }));
+  assert.equal(plain.amount6, undefined);
+  assert.equal(fixed.amount6, 25_000_000n);
+  assert.deepEqual(fixed.intent, i);
+  assert.equal(depositAddress(fixed.intent, FACTORY), depositAddress(i, FACTORY));
+});
+
+test('paymentState: unpaid, underpaid, paid, overpaid', async () => {
+  const { paymentState } = await import('../src/index.js');
+  const e = 25_000_000n;
+  assert.equal(paymentState(e, { received: 0n }).state, 'unpaid');
+  const u = paymentState(e, { received: 15n * 10n ** 18n });
+  assert.deepEqual([u.state, u.received, u.remaining], ['underpaid', '15', '10']);
+  assert.equal(paymentState(e, { received6: 25_000_000n }).state, 'paid');
+  const o = paymentState(e, { received: 26n * 10n ** 18n + 5n });
+  assert.deepEqual([o.state, o.extra], ['overpaid', '1']);
+});
