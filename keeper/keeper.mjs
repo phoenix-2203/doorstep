@@ -37,7 +37,7 @@ const abi = JSON.parse(fs.readFileSync(new URL('./abi.json', import.meta.url))).
 const RPC_URL = process.env.RPC_URL ?? 'https://rpc.mainnet.arc.io';
 const DOORSTEP = process.env.DOORSTEP;
 const FROM_BLOCK = BigInt(process.env.FROM_BLOCK ?? '0');
-const POLL_MS = Number(process.env.POLL_MS ?? 2000);
+const POLL_MS = Number(process.env.POLL_MS ?? 3000);
 const LOG_SPAN = BigInt(process.env.LOG_SPAN ?? 9000); // blocks per eth_getLogs call; Arc's public RPC caps ranges at 10,000
 // One state file per Doorstep contract, so switching DOORSTEP never mixes up registered addresses.
 const STATE_FILE = process.env.STATE_FILE ?? new URL(`./keeper-state-${(process.env.DOORSTEP ?? '').slice(2, 10).toLowerCase()}.json`, import.meta.url).pathname;
@@ -53,12 +53,38 @@ const arc = defineChain({
   rpcUrls: { default: { http: [RPC_URL] } },
 });
 
+// Two endpoints keep a free RPC plan from running out:
+// - WATCH (READ_RPC_URL, default Arc's public RPC): log searches and balance checks. It allows
+//   9,000-block log searches, so watching costs one small request every few seconds.
+// - RPC_URL (your own endpoint): everything for an actual delivery, and the backup for balance
+//   checks. A delivery costs a few hundred compute units on Alchemy's free plan.
+const READ_RPC_URL = process.env.READ_RPC_URL || (chainId === 5042 ? 'https://rpc.mainnet.arc.io' : RPC_URL);
+const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11'; // listed on Arc mainnet in Arc's docs
 const pub = createPublicClient({ chain: arc, transport: http(RPC_URL) });
+const watch = READ_RPC_URL === RPC_URL ? pub : createPublicClient({ chain: arc, transport: http(READ_RPC_URL) });
 const account = await loadAccount();
 const wallet = account ? createWalletClient({ chain: arc, transport: http(RPC_URL), account }) : null;
 
 const realChain = await pub.getChainId();
 if (realChain !== chainId) throw new Error(`RPC is chain ${realChain}, expected ${chainId}`);
+if (watch !== pub) {
+  const watchChain = await watch.getChainId();
+  if (watchChain !== chainId) throw new Error(`READ_RPC_URL is chain ${watchChain}, expected ${chainId}`);
+}
+
+const ETH_BALANCE_ABI = [{ type: 'function', name: 'getEthBalance', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] }];
+// All deposit-address balances in one request (Multicall3), from the watch endpoint, falling back
+// to your own endpoint, and to one-by-one reads if Multicall3 is unavailable.
+async function balancesOf(addresses) {
+  if (!addresses.length) return [];
+  const contracts = addresses.map((a) => ({ address: MULTICALL3, abi: ETH_BALANCE_ABI, functionName: 'getEthBalance', args: [a] }));
+  for (const client of watch === pub ? [pub] : [watch, pub]) {
+    try {
+      return await client.multicall({ contracts, allowFailure: false, multicallAddress: MULTICALL3, batchSize: 0 });
+    } catch { /* try the next endpoint */ }
+  }
+  return Promise.all(addresses.map((a) => pub.getBalance({ address: a })));
+}
 
 // ---------------------------------------------------------------- state
 
@@ -95,7 +121,7 @@ const rpcReason = (e) => (e?.details || e?.cause?.details || e?.shortMessage || 
 
 let lastProgress = 0;
 async function scan() {
-  const head = await pub.getBlockNumber({ cacheTime: 0 });
+  const head = await watch.getBlockNumber({ cacheTime: 0 });
   let from = BigInt(state.cursor);
   const behind = head - from;
   if (behind > 2000n) console.log(`[sync] catching up on ${behind} blocks (${from} -> ${head}), ${span} blocks per search…`);
@@ -103,7 +129,7 @@ async function scan() {
     const to = from + span - 1n < head ? from + span - 1n : head;
     let logs;
     try {
-      logs = await pub.getContractEvents({ address: DOORSTEP, abi, eventName: 'Announced', fromBlock: from, toBlock: to });
+      logs = await watch.getContractEvents({ address: DOORSTEP, abi, eventName: 'Announced', fromBlock: from, toBlock: to });
     } catch (e) {
       if (!isLimit(e)) throw e;
       const stated = statedLimit(e);
@@ -143,8 +169,7 @@ async function scan() {
 
 // ---------------------------------------------------------------- landing
 
-async function tryLand(hash, { depositAddress, intent }) {
-  const balance = await pub.getBalance({ address: depositAddress });
+async function tryLand(hash, { depositAddress, intent }, balance) {
   if (balance === 0n) return;
   const i = revive(intent);
 
@@ -184,6 +209,8 @@ async function tryLand(hash, { depositAddress, intent }) {
 }
 
 const rpcShown = (() => { try { const u = new URL(RPC_URL); if (/^[\d.]+$|localhost/.test(u.hostname)) return `${u.protocol}//${u.host}`; const host = u.hostname.split('.').slice(-2).join('.'); return `${u.protocol}//${u.hostname.split('.').length > 2 ? '…' : ''}${host}${u.pathname.length > 1 || u.search ? '/…' : ''}`; } catch { return 'RPC'; } })();
+const shown = (url) => { try { const u = new URL(url); if (/^[\d.]+$|localhost/.test(u.hostname)) return `${u.protocol}//${u.host}`; const host = u.hostname.split('.').slice(-2).join('.'); return `${u.protocol}//${u.hostname.split('.').length > 2 ? '…' : ''}${host}${u.pathname.length > 1 || u.search ? '/…' : ''}`; } catch { return 'RPC'; } };
+if (watch !== pub) console.log(`Watching with ${shown(READ_RPC_URL)}; delivering with ${rpcShown}.`);
 console.log(`Doorstep keeper on chain ${chainId} (${rpcShown}), contract ${DOORSTEP}, ${wallet ? 'signing as ' + account.address : 'read-only'}`);
 if (account) {
   const bal = await pub.getBalance({ address: account.address });
@@ -192,7 +219,9 @@ if (account) {
 for (;;) {
   try {
     await scan();
-    for (const [h, entry] of Object.entries(state.intents)) await tryLand(h, entry);
+    const entries = Object.entries(state.intents);
+    const balances = await balancesOf(entries.map(([, e]) => e.depositAddress));
+    for (let k = 0; k < entries.length; k++) await tryLand(entries[k][0], entries[k][1], balances[k]);
   } catch (e) {
     console.error(`[error] ${e.shortMessage ?? e.message}${e.details && e.details !== e.shortMessage ? ` (RPC said: "${rpcReason(e)}")` : ''}`);
     if (isLimit(e)) await sleep(10_000);
