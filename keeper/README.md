@@ -4,6 +4,8 @@ The bot watches every Doorstep address that has been registered (announced), and
 
 The bot can only ever deliver to the contract in the instructions or return the money to the refund wallet. A bot that stops just means payments wait until someone delivers them.
 
+It serves everyone: any app or person who registers an address on the same Doorstep contract gets deliveries from your bot, with no access to your server. It only delivers when the payment repays it (the address's fee limit and the payment itself must cover the gas), so addresses registered with a 0 fee limit can't drain it; their owners can deliver from the pay page. Payments it can't deliver yet (for example under their minimum) are set aside until more money arrives or the deadline passes, so they don't use up your RPC plan.
+
 ## 1. Give the bot its own wallet
 
 Use a separate wallet with a little USDC for gas, not your main wallet.
