@@ -34,6 +34,14 @@ async function loadAccount() {
 
 const abi = JSON.parse(fs.readFileSync(new URL('./abi.json', import.meta.url))).Doorstep;
 
+// Read keeper/.env when started directly (`node keeper.mjs`); settings already in the environment win.
+try {
+  const envFile = new URL('./.env', import.meta.url);
+  const saved = { ...process.env };
+  process.loadEnvFile(envFile);
+  Object.assign(process.env, saved);
+} catch { /* no .env: use the environment as is */ }
+
 const RPC_URL = process.env.RPC_URL ?? 'https://rpc.mainnet.arc.io';
 const DOORSTEP = process.env.DOORSTEP;
 const FROM_BLOCK = BigInt(process.env.FROM_BLOCK ?? '0');
