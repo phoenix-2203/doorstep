@@ -37,6 +37,19 @@ ds.toLink(intent);         // a link to the Doorstep app's pay page for this int
 
 The payer then just sends USDC on Arc to that address, from any wallet or exchange.
 
+## Ask for an exact amount (invoices)
+
+```js
+const invoice = ds.depositIntent({ into: vault, beneficiary: freelancer, refundTo: client, minimum: '25', reference: 'inv-9' });
+ds.toLink(invoice, { amount: '25' });   // pay page says "Pay 25 USDC for inv-9" and tracks what's missing
+
+const { waitingRaw } = await ds.status(invoice);
+ds.paymentState(25_000_000n, { received: waitingRaw });
+// { state: 'underpaid', received: '15', remaining: '10', ... }  ->  'paid' / 'overpaid'
+```
+
+Setting `minimum` to the invoice amount means nothing is delivered until all of it has arrived. Anything paid above it is delivered too.
+
 ## Watch it land
 
 ```js
