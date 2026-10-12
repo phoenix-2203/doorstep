@@ -78,7 +78,10 @@ body {
 }
 a { color: var(--link); text-underline-offset: 3px; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
-code, .mono { font-family: var(--mono); font-size: .9em; }
+code, .mono, pre { font-family: var(--mono); }
+/* JetBrains Mono turns => and === into arrows; code must show what you type. */
+code, .mono, pre, pre *, .addr, .m, .hash { font-variant-ligatures: none !important; }
+code { font-size: .9em; }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
