@@ -115,7 +115,9 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | `keeper/e2e.mjs` | End-to-end rehearsal with real transactions (local node or testnet) |
 | `keeper/feecheck.mjs` | Keeper fee versus actual gas cost for every landing |
 | `keeper/vector.mjs` | The viem address derivation pinned by `test_addressMatchesViemVector` |
-| `web/` | Static app built on the SDK: answer seven questions, get an address and QR code, pay, watch it land, cancel |
+| `web/` | Static site built on the SDK: landing page with an instruction inspector and live mainnet activity (`index.html`, `landing.js`), and the app with the live demo, pay pages and payment-link tool (`app/`, `app.js`). `cd web && npm i && node build.mjs` builds `web/dist` |
+| `web/brand/` | Logo, icon, one-colour variants, touch icon and shared design tokens (`brand.css`) |
+| `design/` | Implementation audit, competitor review, design system, brand notes, redesign plan and report |
 
 ## What has been verified
 
