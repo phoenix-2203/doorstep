@@ -37,7 +37,7 @@ const abi = JSON.parse(fs.readFileSync(new URL('./abi.json', import.meta.url))).
 const RPC_URL = process.env.RPC_URL ?? 'https://rpc.mainnet.arc.io';
 const DOORSTEP = process.env.DOORSTEP;
 const FROM_BLOCK = BigInt(process.env.FROM_BLOCK ?? '0');
-const POLL_MS = Number(process.env.POLL_MS ?? 3000);
+const POLL_MS = Number(process.env.POLL_MS ?? 5000);
 const LOG_SPAN = BigInt(process.env.LOG_SPAN ?? 9000); // blocks per eth_getLogs call; Arc's public RPC caps ranges at 10,000
 // One state file per Doorstep contract, so switching DOORSTEP never mixes up registered addresses.
 const STATE_FILE = process.env.STATE_FILE ?? new URL(`./keeper-state-${(process.env.DOORSTEP ?? '').slice(2, 10).toLowerCase()}.json`, import.meta.url).pathname;
@@ -61,7 +61,8 @@ const arc = defineChain({
 const READ_RPC_URL = process.env.READ_RPC_URL || (chainId === 5042 ? 'https://rpc.mainnet.arc.io' : RPC_URL);
 const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11'; // listed on Arc mainnet in Arc's docs
 const pub = createPublicClient({ chain: arc, transport: http(RPC_URL) });
-const watch = READ_RPC_URL === RPC_URL ? pub : createPublicClient({ chain: arc, transport: http(READ_RPC_URL) });
+// No automatic retries on the watch endpoint: retrying a rate-limited request immediately only makes it worse.
+const watch = READ_RPC_URL === RPC_URL ? pub : createPublicClient({ chain: arc, transport: http(READ_RPC_URL, { retryCount: 0 }) });
 const account = await loadAccount();
 const wallet = account ? createWalletClient({ chain: arc, transport: http(RPC_URL), account }) : null;
 
@@ -119,34 +120,68 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isLimit = (e) => e?.code === -32005 || /limit|range|too many|exceed|too large|response size|rate/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
 const rpcReason = (e) => (e?.details || e?.cause?.details || e?.shortMessage || e?.message || String(e)).toString().split('\n')[0];
 
+// Arc's public RPC allows roughly one request per second per connection, shared with anything
+// else on the same network (a browser with the Doorstep site open counts). So the bot paces itself:
+// one log search every LOGS_EVERY_MS, one batched balance check every POLL_MS, at most one request
+// per PACE_MS while catching up, and after a rate-limit refusal it waits instead of retrying hard.
+const LOGS_EVERY_MS = Number(process.env.LOGS_EVERY_MS ?? 15_000);
+const PACE_MS = Number(process.env.PACE_MS ?? 1_200);
+const isRate = (e) => e?.status === 429 || /rate.?limit|too many requests|429/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+let nextScanAt = 0;
+let refusedSince = 0;
+let refusedCount = 0;
+function noteRefusal(e, what) {
+  refusedCount += 1;
+  backoffMs = Math.min(backoffMs ? backoffMs * 2 : 5_000, 120_000);
+  nextScanAt = Date.now() + backoffMs;
+  // One line per refusal streak, not one per retry.
+  if (refusedCount === 1) {
+    refusedSince = Date.now();
+    console.log(`[rpc busy] ${what}: "${rpcReason(e)}". Pausing log searches; retrying in ${backoffMs / 1000}s.`);
+  }
+}
+function noteRecovered() {
+  if (refusedCount > 0) console.log(`[rpc ok] searches working again after ${Math.round((Date.now() - refusedSince) / 1000)}s.`);
+  refusedCount = 0;
+  backoffMs = 0;
+}
+
 let lastProgress = 0;
 async function scan() {
-  const head = await watch.getBlockNumber({ cacheTime: 0 });
+  let head;
+  try {
+    head = await watch.getBlockNumber({ cacheTime: 0 });
+  } catch (e) {
+    if (isRate(e) || isLimit(e)) return noteRefusal(e, 'eth_blockNumber');
+    throw e;
+  }
   let from = BigInt(state.cursor);
   const behind = head - from;
   if (behind > 2000n) console.log(`[sync] catching up on ${behind} blocks (${from} -> ${head}), ${span} blocks per search…`);
+  let first = true;
   while (from <= head) {
+    if (!first) await sleep(PACE_MS);
+    first = false;
     const to = from + span - 1n < head ? from + span - 1n : head;
     let logs;
     try {
       logs = await watch.getContractEvents({ address: DOORSTEP, abi, eventName: 'Announced', fromBlock: from, toBlock: to });
     } catch (e) {
+      if (isRate(e)) return noteRefusal(e, `eth_getLogs ${from}-${to}`);
       if (!isLimit(e)) throw e;
       const stated = statedLimit(e);
       if (stated && stated > 0n && stated < maxSpan) {
-        // The RPC told us its range limit: use exactly that from now on, no waiting needed.
+        // The RPC told us its range limit: use exactly that from now on.
         maxSpan = stated;
         span = stated;
         console.log(`[rpc] this endpoint allows ${stated}-block log searches; using that size.`);
         continue;
       }
-      backoffMs = Math.min(backoffMs ? backoffMs * 2 : 1000, 60_000);
-      console.log(`[rpc refused] eth_getLogs blocks ${from}-${to} (${to - from + 1n} blocks): "${rpcReason(e)}". Retrying in ${backoffMs / 1000}s${span > MIN_SPAN ? ' with a smaller range' : ''}.`);
-      if (span > MIN_SPAN) span = span / 2n < MIN_SPAN ? MIN_SPAN : span / 2n;
-      await sleep(backoffMs);
-      continue;
+      // A range refusal without a number: try a smaller range.
+      if (span > MIN_SPAN) { span = span / 2n < MIN_SPAN ? MIN_SPAN : span / 2n; continue; }
+      return noteRefusal(e, `eth_getLogs ${from}-${to}`);
     }
-    backoffMs = 0;
+    noteRecovered();
     for (const log of logs) {
       const { intentHash, depositAddress, intent } = log.args;
       if (!state.intents[intentHash]) {
@@ -165,6 +200,7 @@ async function scan() {
     if (span < maxSpan) span = span * 2n > maxSpan ? maxSpan : span * 2n;
   }
   if (behind > 2000n) console.log(`[sync] caught up at block ${head}. Watching for payments.`);
+  nextScanAt = Date.now() + LOGS_EVERY_MS;
 }
 
 // ---------------------------------------------------------------- landing
@@ -218,13 +254,15 @@ if (account) {
 }
 for (;;) {
   try {
-    await scan();
+    if (Date.now() >= nextScanAt) await scan();
     const entries = Object.entries(state.intents);
     const balances = await balancesOf(entries.map(([, e]) => e.depositAddress));
     for (let k = 0; k < entries.length; k++) await tryLand(entries[k][0], entries[k][1], balances[k]);
   } catch (e) {
-    console.error(`[error] ${e.shortMessage ?? e.message}${e.details && e.details !== e.shortMessage ? ` (RPC said: "${rpcReason(e)}")` : ''}`);
-    if (isLimit(e)) await sleep(10_000);
+    if (isRate(e)) { noteRefusal(e, 'request'); } else {
+      console.error(`[error] ${e.shortMessage ?? e.message}${e.details && e.details !== e.shortMessage ? ` (RPC said: "${rpcReason(e)}")` : ''}`);
+      if (isLimit(e)) await sleep(10_000);
+    }
   }
   await new Promise((r) => setTimeout(r, POLL_MS));
 }
