@@ -27,15 +27,16 @@ export const AMOUNT = 0xd00257e9d00257e9d00257e9d00257e9d00257e9d00257e9d00257e9
 const SCALE = 10n ** 12n; // native units per 6-decimal unit
 const LOG_SPAN = 9000n; // Arc RPCs cap eth_getLogs at 10,000 blocks; some refuse less (see scanLogs)
 
-const isRangeLimit = (e) => /limit|range|too many|exceed|too large|10000|response size/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+const isRangeLimit = (e) => e?.code === -32005 || /limit|range|too many|exceed|too large|10000|response size|rate/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
 
 /**
  * Run `fetchRange(from, to)` over [fromBlock, toBlock] in chunks, shrinking the chunk whenever the
  * RPC refuses a range ("Request exceeds defined limit", "query exceeds max block range", …) and
  * growing it back after successes. Results are concatenated in block order.
  */
-export async function scanLogs(fetchRange, fromBlock, toBlock, { span = LOG_SPAN, minSpan = 50n, onProgress } = {}) {
+export async function scanLogs(fetchRange, fromBlock, toBlock, { span = LOG_SPAN, minSpan = 50n, maxWaits = 6, onProgress } = {}) {
   const out = [];
+  let waits = 0;
   let size = BigInt(span);
   let from = BigInt(fromBlock);
   const end = BigInt(toBlock);
@@ -47,9 +48,14 @@ export async function scanLogs(fetchRange, fromBlock, toBlock, { span = LOG_SPAN
       from = to + 1n;
       if (size < BigInt(span)) size = size * 2n > BigInt(span) ? BigInt(span) : size * 2n;
     } catch (e) {
-      if (!isRangeLimit(e) || size <= minSpan) throw e;
-      size = size / 2n < minSpan ? minSpan : size / 2n;
+      // -32005 also means "too many requests", so wait a little longer each time as well.
+      if (!isRangeLimit(e) || (size <= minSpan && waits >= maxWaits)) throw e;
+      if (size > minSpan) size = size / 2n < minSpan ? minSpan : size / 2n;
+      await new Promise((r) => setTimeout(r, Math.min(500 * 2 ** waits, 8000)));
+      waits += 1;
+      continue;
     }
+    waits = 0;
   }
   return out;
 }
