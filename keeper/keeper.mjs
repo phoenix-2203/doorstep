@@ -216,16 +216,29 @@ async function scan() {
 
 // ---------------------------------------------------------------- landing
 
+// Payments the bot can't (or won't) deliver right now are set aside until something changes: more
+// money arrives, the intent expires (then it can be refunded), or 10 minutes pass. Without this, a
+// payment waiting for its minimum would cost a simulation on your own RPC every few seconds.
+const parked = new Map(); // intentHash -> { balance, until }
+const park = (hash, balance, until) => parked.set(hash, { balance, until });
+
 async function tryLand(hash, { depositAddress, intent }, balance) {
-  if (balance === 0n) return;
+  if (balance === 0n) { parked.delete(hash); return; }
+  const p = parked.get(hash);
+  if (p && p.balance === balance && Date.now() < p.until) return;
   const i = revive(intent);
+  const expiryMs = Number(i.expiry) * 1000;
+  const later = Date.now() < expiryMs ? Math.min(expiryMs + 2_000, Date.now() + 600_000) : Date.now() + 600_000;
 
   // Simulate first: BelowMinimum / NothingToLand / InvalidIntent revert here at no cost.
   try {
     await pub.simulateContract({ address: DOORSTEP, abi, functionName: 'land', args: [i], account: account?.address });
   } catch (e) {
-    const reason = e.shortMessage ?? e.message;
-    if (!/BelowMinimum/.test(reason)) console.log(`[skip] ${hash.slice(0, 10)} ${formatUnits(balance, 18)} USDC: ${reason.split('\n')[0]}`);
+    const name = e.walk?.((x) => x?.data?.errorName)?.data?.errorName;
+    const reason = name === 'BelowMinimum' ? `under its ${formatUnits(i.minAmount6, 6)} USDC minimum; waiting for more`
+      : name ? name : (e.shortMessage ?? e.message).split('\n')[0];
+    console.log(`[wait] ${hash.slice(0, 10)} ${formatUnits(balance, 18)} USDC: ${reason}.`);
+    park(hash, balance, later);
     return;
   }
 
@@ -241,6 +254,17 @@ async function tryLand(hash, { depositAddress, intent }, balance) {
   // Estimate WITH a gas price: at price 0 the keeper fee is 0, the fee transfer is skipped, and
   // the estimate comes out ~7k gas short. Then add headroom; unused gas is not charged.
   const est = await pub.estimateContractGas({ address: DOORSTEP, abi, functionName: 'land', args: [i], account, maxFeePerGas, maxPriorityFeePerGas: 0n });
+
+  // Only deliver when the payment will repay the bot: its fee is capped by the intent's fee limit
+  // and by the payment itself. Anyone can register addresses, including ones with a 0 fee limit;
+  // a public bot must not pay for those. Their owners can still deliver them themselves.
+  const cost = est * base;
+  const repayCap = i.maxKeeperFee6 * 10n ** 12n < balance ? i.maxKeeperFee6 * 10n ** 12n : balance;
+  if (repayCap < cost) {
+    if (!p || p.balance !== balance) console.log(`[skip] ${hash.slice(0, 10)} ${formatUnits(balance, 18)} USDC: delivering costs ~${formatUnits(cost, 18)} USDC in gas but this address repays at most ${formatUnits(repayCap, 18)}. Its owner can deliver it from the pay page.`);
+    park(hash, balance, Date.now() + 600_000);
+    return;
+  }
   const hashTx = await wallet.writeContract({
     address: DOORSTEP,
     abi,
