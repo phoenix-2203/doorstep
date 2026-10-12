@@ -3,7 +3,7 @@
 **Let people pay into your Arc app from any wallet or exchange.** On Arc, a wallet's "Send USDC" can't pay into most vaults, escrows and checkouts, because they only accept money through their own deposit function. Doorstep gives each payer an address. Whatever arrives there is deposited into your contract, credited to the right person, within seconds, or sent back if that isn't possible.
 
 - **Try it:** https://phoenix-2203.github.io/doorstep/ (any visitor gets their own savings address on Arc mainnet and can top it up from any wallet or exchange)
-- **Build with it:** the [`doorstep-arc` SDK](sdk/README.md)
+- **Build with it:** the [`doorstep-arc` SDK](sdk/README.md), or the hosted HTTPS API with webhooks: https://api.104-251-218-80.sslip.io/docs ([api/](api/README.md); API keys on request)
 - **Delivery:** a public delivery bot runs 24/7 for every registered address on Doorstep v2 (wallet [`0xd6aA…4497`](https://explorer.arc.io/address/0xd6aA9A15e5a95754F8B02a08A0C3E3CA7E614497)). Anyone can run another: [keeper/README.md](keeper/README.md)
 - **On Arc mainnet (chain 5042):** Doorstep v2 [`0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229`](https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229) · demo savings vault [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3) · v1 (no cancel, still works for its addresses) [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080)
 
@@ -109,6 +109,7 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | `script/Deploy.s.sol` | Deploys to Arc mainnet or testnet; refuses other chains |
 | `scripts/demo-mainnet.sh` | Live mainnet demo with `arc-cast` and a keystore: problem, two landings at one address, a bounce, a withdrawal |
 | `sdk/` | `doorstep-arc` JavaScript/TypeScript SDK: build intents in plain terms, explain them, compute addresses offline, share links, watch, land, cancel |
+| `api/` | Hosted HTTPS API: create addresses and exact-amount invoices, check status, signed webhooks when payments are delivered or returned, API keys, `/docs` |
 | `keeper/keeper.mjs` | Permissionless keeper: discovers `Announced` intents from logs (in spans under the RPC's 10,000-block cap), lands deposits. Signs with a Foundry keystore (`keeper/keystore.mjs`) |
 | `keeper/e2e.mjs` | End-to-end rehearsal with real transactions (local node or testnet) |
 | `keeper/feecheck.mjs` | Keeper fee versus actual gas cost for every landing |
@@ -127,6 +128,8 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | Page and contract compute the same deposit address | `test_addressMatchesViemVector` | equal |
 | The same tests against live Arc mainnet state | `arc-forge test --fork-url https://rpc.mainnet.arc.io` | all pass (v1, 25 tests) |
 | Live runs on Arc mainnet: native send lands, ERC-20 transfer to the same address lands, expired intent bounces, early cancel refunds (v2) | `scripts/demo-mainnet.sh` | all pass, see [Mainnet proof](#mainnet-proof) |
+| Hosted API: invoice paid in two parts (part_paid, then delivered/paid), cancel (cancelled), both webhooks signed and verified; 401 without a key, 400 on bad input | `api/` on a local Arc node with the bot | all pass |
+| Hosted API live on mainnet: health check from outside, an address created and registered with an API key | https://api.104-251-218-80.sslip.io | works |
 | Live site on mainnet: a visitor's savings address, paid from a wallet, delivered automatically by the bot | https://phoenix-2203.github.io/doorstep/ + `keeper/` | delivered, see [Mainnet proof](#mainnet-proof) |
 
 Arc's USDC system contracts used in the tests are generated from `circlefin/arc-node`'s genesis. The USDC proxy and implementation bytecode are identical in the localdev and mainnet genesis files.
