@@ -11,6 +11,14 @@ export const CONFIG = {
   legacy: [{ version: 1, doorstep: '0xd614A7B602E1417F258A834465AE01F47891e080', deployBlock: 25488972 }],
 };
 
+// Public addresses of the site and API (update when the domain changes).
+export const SITE = {
+  url: 'https://phoenix-2203.github.io/doorstep/',
+  app: 'https://phoenix-2203.github.io/doorstep/app/',
+  api: 'https://api.104-251-218-80.sslip.io',
+  repo: 'https://github.com/phoenix-2203/doorstep',
+};
+
 export const TESTNET = {
   chainId: 5042002,
   rpcUrl: 'https://rpc.testnet.arc.io',
