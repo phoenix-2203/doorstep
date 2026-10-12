@@ -20,6 +20,25 @@ None of them can call `deposit(amount, beneficiary)` for the user.
 
 `DemoEscrow` in this repo is that ordinary escrow, and `test_plainWalletSendToEscrowReverts` shows the failure. Its `deposit(uint256 amount, address beneficiary)` has the same selector (`0x6e553f65`) and argument order as ERC-4626 `deposit(assets, receiver)`, so the same intent shape funds any ERC-4626 vault on Arc.
 
+## Instructions in plain words
+
+Every Doorstep address comes with an **instruction** (the contract calls it an *intent*). It answers seven questions:
+
+| Question | Field | Example |
+| --- | --- | --- |
+| Which contract should the money go into? | `target` | the rent vault |
+| What should Doorstep call on it, and for whom? | `callData` | `deposit(amount, Chidi)` |
+| Where in that call does the amount go? | `amountOffset` | the first argument |
+| If it can't be delivered, where does it go back to? This wallet can also cancel. | `refundTo` | Chidi's wallet |
+| Wait until at least how much has arrived? | `minAmount6` | 500 USDC |
+| What's the most the deliverer may keep for gas? | `maxKeeperFee6` | 0.01 USDC |
+| After when should it stop delivering and refund instead? | `expiry` | 30 Nov 2026 |
+| Your reference | `ref` | `rent-nov` |
+
+The address is calculated from the answers, so changing any answer gives a different address. Nobody can redirect an address after it's handed out, and anyone can recompute it to check. The app and SDK show the instruction as one paragraph, for example:
+
+> USDC sent to this address is deposited into the rent vault for Chidi. It waits until at least 500 USDC has arrived. If it can't be delivered, or hasn't been delivered by 2026-11-30 12:00 UTC, it goes back to Chidi. Chidi can also take it back at any time before it is delivered. Whoever delivers it is repaid their network fee from the deposit, at most 0.01 USDC.
+
 ## How it works
 
 ```
@@ -38,7 +57,19 @@ depositAddress = CREATE2(Doorstep, salt = keccak256(abi.encode(intent)), Doorste
     6. repays the caller's gas from the deposit, capped by `maxKeeperFee6`.
 4. **The address is reusable.** The lander is created and destroyed in the same transaction (EIP-6780), so the address has no code afterwards. It can receive again, even from exchanges that send with a fixed 21,000 gas limit.
 
-If the intent has expired, or the target call reverts, the deposit **bounces** to `refundTo`. If less than `minAmount6` has arrived, `land` reverts and the funds wait at the address for a top-up.
+5. **`refundTo` can cancel at any time** (v2). `cancel(intent)` sweeps the address and sends everything back to `refundTo` in the same transaction, with no keeper fee. The address keeps working afterwards.
+
+### When money goes back
+
+| Situation | What happens |
+| --- | --- |
+| The intent has expired when it's landed | Refunded to `refundTo`, minus the keeper's gas (**Bounced: expired**) |
+| The target call reverts | Refunded to `refundTo`, minus the keeper's gas (**Bounced: target call failed**) |
+| `refundTo` calls `cancel` | Everything refunded at once, no fee (**Bounced: cancelled**) |
+| The target takes less than offered | The rest goes to `refundTo`; still **Landed** |
+| Less than `minAmount6` has arrived, not expired | `land` reverts; the money waits for a top-up, a cancel, or the expiry |
+| The target runs out of gas | `land` reverts, so a keeper can't force a refund; it refunds after expiry |
+| `refundTo` or the target is blocklisted on Arc | The money stays at the address |
 
 ## Why this is Arc-native
 
@@ -59,7 +90,8 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 - **`refundTo` must be an address the author controls**, never an exchange deposit address. Refunds go there.
 - **Blocklist:** if `refundTo` or the target is blocklisted on Arc, `land` reverts and the funds stay at the deposit address (`test_blocklistedRefundToKeepsFundsAtAddress`).
 - **No forced bounces:** a keeper picks its own gas limit, so it could try to starve the target call and make a good deposit bounce. If the target call fails by running out of the gas it was given, `land` reverts instead, and the funds stay put. A target that can never succeed is refunded after expiry, because that path never calls it (`test_outOfGasTargetNeverBounces`, `test_underGassedLandingCannotForceBounce`).
-- **Keeper fee:** the keeper is paid the gas it actually used, at `min(tx.gasprice, 2 × basefee)`, never above the intent's cap and never above the deposit. Before the target call, Doorstep reserves an upper-bound fee so the credited amount is fixed in advance. After the call, it measures the real gas, including the 19,900-gas allowance refund the keeper never pays, and returns the unused reserve to `refundTo`. Measured on a local Arc Zero8 node, the fee is within +2–3% of the keeper's real cost on every path (`keeper/feecheck.mjs`).
+- **Keeper fee:** the keeper is paid the gas it actually used, at `min(tx.gasprice, 2 × basefee)`, never above the intent's cap and never above the deposit. Before the target call, Doorstep reserves an upper-bound fee so the credited amount is fixed in advance. After the call, it measures the real gas, including the 19,900-gas allowance refund the keeper never pays and the 25,000 gas a refund to a brand-new `refundTo` account costs, and returns the unused reserve to `refundTo`. Measured on a local Arc Zero8 node, the fee is within 0 to +3% of the keeper's real cost on every path (`keeper/feecheck.mjs`).
+- **Cancel:** only `refundTo` can cancel, and only what is waiting at the address. Until a cancel, anyone may still deliver to the target (that is the instruction working as written).
 - **Gas estimates:** at gas price 0 the fee is 0 and the fee transfer is skipped, so a plain `eth_estimateGas` comes out about 7k gas short. The keeper and app estimate with a real gas price and add headroom; do the same in any integration.
 - **Unaudited.** Use small amounts.
 
@@ -67,28 +99,30 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 
 | Path | What it is |
 | --- | --- |
-| `src/Doorstep.sol` | Factory, lander, landing logic (about 340 lines, heavily commented) |
+| `src/Doorstep.sol` | Factory, lander, landing logic (about 370 lines, heavily commented) |
 | `src/DemoEscrow.sol` | An ordinary non-payable escrow, the demo target |
 | `test/Doorstep.t.sol` | Tests run under Arc semantics with Arc Foundry |
 | `test/ArcGenesis.sol` | Arc's USDC and system contracts, generated from `circlefin/arc-node` genesis, etched only if missing |
 | `script/Deploy.s.sol` | Deploys to Arc mainnet or testnet; refuses other chains |
 | `scripts/demo-mainnet.sh` | Live mainnet demo with `arc-cast` and a keystore: problem, two landings at one address, a bounce, a withdrawal |
-| `keeper/keeper.mjs` | Permissionless keeper: discovers `Announced` intents from logs (in spans under the RPC's 10,000-block cap), lands deposits |
+| `sdk/` | `doorstep-arc` JavaScript/TypeScript SDK: build intents in plain terms, explain them, compute addresses offline, share links, watch, land, cancel |
+| `keeper/keeper.mjs` | Permissionless keeper: discovers `Announced` intents from logs (in spans under the RPC's 10,000-block cap), lands deposits. Signs with a Foundry keystore (`keeper/keystore.mjs`) |
 | `keeper/e2e.mjs` | End-to-end rehearsal with real transactions (local node or testnet) |
 | `keeper/feecheck.mjs` | Keeper fee versus actual gas cost for every landing |
 | `keeper/vector.mjs` | The viem address derivation pinned by `test_addressMatchesViemVector` |
-| `web/` | Static app: create an address, pay, watch it land |
+| `web/` | Static app built on the SDK: answer seven questions, get an address and QR code, pay, watch it land, cancel |
 
 ## What has been verified
 
 | Check | Where | Result |
 | --- | --- | --- |
-| 25 unit and fuzz tests under Arc execution rules (hardfork Zero8, the one mainnet runs) | `test/Doorstep.t.sol` with Arc Foundry | all pass |
+| 32 unit and fuzz tests under Arc execution rules (hardfork Zero8, the one mainnet runs), including 7 for early cancel | `test/Doorstep.t.sol` with Arc Foundry | all pass |
+| SDK: offline tests (address vector shared with the Solidity test, links, plain-language text) and integration tests on a local Arc node (pay, land, cancel, watch) | `sdk/test/` | 12 + 6 pass |
 | Real separate transactions on a local Arc node: wallet send to escrow reverts; native send lands; **same address reused in a later transaction**; ERC-20 transfer lands; expired intent bounces; factory ends empty | `keeper/e2e.mjs` against `arc-anvil --network arc --hardfork arc:zero8` | all pass |
-| Keeper discovers an announced intent from logs and lands a deposit unattended | `keeper/keeper.mjs` | landed |
-| Web app: create address, QR, live status, landed state, mobile layout | headless Chromium against the local node | works |
+| Keeper, signing with a Foundry keystore, discovers an announced intent from logs and lands a deposit unattended | `keeper/keeper.mjs` | landed |
+| Web app: plain-language preview, create address, QR, waiting-for-minimum, cancelled, delivered, mobile layout | headless Chromium against the local node | works |
 | Page and contract compute the same deposit address | `test_addressMatchesViemVector` | equal |
-| The same 25 tests against live Arc mainnet state | `arc-forge test --fork-url https://rpc.mainnet.arc.io` | all pass |
+| The same tests against live Arc mainnet state | `arc-forge test --fork-url https://rpc.mainnet.arc.io` | all pass (v1, 25 tests) |
 | Live run on Arc mainnet: deploy, native send lands, ERC-20 transfer to the same address lands, expired intent bounces | `scripts/demo-mainnet.sh` | all pass, see [Mainnet proof](#mainnet-proof) |
 
 Arc's USDC system contracts used in the tests are generated from `circlefin/arc-node`'s genesis. The USDC proxy and implementation bytecode are identical in the localdev and mainnet genesis files.
@@ -129,12 +163,21 @@ Live demo on mainnet (about 0.13 USDC moves through Doorstep and comes back, min
 bash scripts/demo-mainnet.sh      # asks for the keystore password once
 ```
 
-Keeper:
+Keeper (use a separate wallet holding a little USDC for gas):
 
 ```shell
+arc-cast wallet import doorstep-keeper --interactive
 cd keeper && npm install
-DOORSTEP=0x... FROM_BLOCK=<deploy block> KEEPER_PRIVATE_KEY=0x... node keeper.mjs
+DOORSTEP=0x... FROM_BLOCK=<deploy block> KEEPER_KEYSTORE=~/.foundry/keystores/doorstep-keeper node keeper.mjs
 ```
+
+SDK:
+
+```shell
+cd sdk && npm install && npm test
+```
+
+See [`sdk/README.md`](sdk/README.md) for the API.
 
 App (dependencies are bundled, so the page loads no third-party scripts at runtime):
 
@@ -142,7 +185,7 @@ App (dependencies are bundled, so the page loads no third-party scripts at runti
 cd web && npm install && npm run build      # outputs web/dist/
 ```
 
-Put the deployed addresses and deploy block in `web/dist/config.js` (or `web/config.js` before building), then publish `web/dist/` on any static host, such as GitHub Pages. Links accept `?chain=`, `?rpc=`, `?doorstep=` and `?escrow=` overrides.
+Put the deployed addresses and deploy block in `web/config.js` before building, then publish `web/dist/` on any static host, such as GitHub Pages. Links accept `?chain=`, `?rpc=`, `?doorstep=` and `?escrow=` overrides.
 
 ## Mainnet proof
 

@@ -31,6 +31,9 @@ contract DoorstepLander {
 /// itself, which is plain arithmetic on Arc because gas is paid in USDC. The repayment is capped
 /// by `maxKeeperFee6`.
 ///
+/// `refundTo` may call `cancel(intent)` at any time to take back whatever is waiting at the
+/// address, without waiting for the expiry and without paying a keeper.
+///
 /// Trust model: the payer trusts whoever gave them the intent (exactly as with any invoice or
 /// payment link). Doorstep holds no funds between transactions and keeps no balances in storage.
 contract Doorstep {
@@ -45,8 +48,8 @@ contract Doorstep {
 
     /// @notice Gas spent after the final meter reading: the refund and fee transfers (value
     ///         transfers on Arc include blocklist checks), the event and the return. Calibrated
-    ///         against arc-anvil on hardfork Zero8 (keeper/feecheck.mjs: fee within +2-3% of gas cost).
-    uint256 public constant TAIL_GAS = 22_000;
+    ///         against arc-anvil on hardfork Zero8 (keeper/feecheck.mjs: fee within 0 to +3% of gas cost on every path).
+    uint256 public constant TAIL_GAS = 19_600;
 
     /// @notice Gas refunded at the end of the transaction when the USDC allowance goes from zero to
     ///         an amount and back to zero (EIP-2200/EIP-3529: restoring a slot's original value
@@ -57,6 +60,10 @@ contract Doorstep {
     ///         the fee before the call so the amount credited is known in advance. The keeper is
     ///         paid what was actually used; the unused part of the reserve goes to refundTo.
     uint256 public constant DELIVERY_GAS_ESTIMATE = 150_000;
+
+    /// @notice Extra gas for a value transfer that creates an account (EIP-161 empty `refundTo`),
+    ///         charged only in that case so the keeper's real cost stays covered.
+    uint256 public constant NEW_ACCOUNT_GAS = 25_000;
 
     /// @notice Gas kept back from the target call so the refund path can always run.
     uint256 internal constant GAS_RESERVE = 120_000;
@@ -77,7 +84,8 @@ contract Doorstep {
 
     enum BounceReason {
         Expired,
-        CallFailed
+        CallFailed,
+        Cancelled
     }
 
     event Landed(
@@ -110,6 +118,7 @@ contract Doorstep {
     error Reentrancy();
     error NativeTransferFailed(address to);
     error InsufficientGas();
+    error NotRefundTo();
 
     bytes32 public immutable LANDER_CODE_HASH = keccak256(type(DoorstepLander).creationCode);
 
@@ -182,8 +191,10 @@ contract Doorstep {
         // Reserve an upper bound for the fee so the amount offered to the target is fixed up front.
         l.fee = _keeperFee(gasStart, intent.maxKeeperFee6, l.arrived, l.expired ? 0 : DELIVERY_GAS_ESTIMATE);
         if (!l.expired) _deliver(intent, l);
-        // Then pay the keeper what was actually used (never more than the reserve).
-        uint256 exact = _keeperFee(gasStart, intent.maxKeeperFee6, l.arrived, 0);
+        // Then pay the keeper what was actually used (never more than the reserve). Sending the
+        // refund to an empty account costs the keeper an extra 25,000 gas after the last reading.
+        address r = intent.refundTo;
+        uint256 exact = _keeperFee(gasStart, intent.maxKeeperFee6, l.arrived, r.balance == 0 && r.code.length == 0 ? NEW_ACCOUNT_GAS : 0);
         if (!l.expired) {
             // The approve/revoke round trip is refunded at the end of the transaction.
             uint256 price = _price();
@@ -209,6 +220,28 @@ contract Doorstep {
                 l.revertData
             );
         }
+        _exit();
+    }
+
+    /// @notice Early cancel: `refundTo` takes back everything waiting at the intent's address now,
+    ///         before or after the expiry. No keeper fee is charged; the caller pays its own gas.
+    ///         The address stays usable: anything sent later can still land or be cancelled.
+    /// @return refunded Native units (18 decimals) sent to `refundTo`.
+    function cancel(Intent calldata intent) external returns (uint256 refunded) {
+        if (msg.sender != intent.refundTo) revert NotRefundTo();
+        _enter();
+        bytes32 h = intentHash(intent);
+        address depositAddress = _addressOf(h);
+        _validate(intent, depositAddress);
+        if (depositAddress.balance == 0) revert NothingToLand();
+
+        uint256 before = address(this).balance;
+        new DoorstepLander{salt: h}();
+        refunded = address(this).balance - before;
+        if (refunded == 0) revert NothingToLand();
+        _sendNative(intent.refundTo, refunded);
+
+        emit Bounced(h, intent.ref, intent.refundTo, depositAddress, BounceReason.Cancelled, refunded, 0, "");
         _exit();
     }
 

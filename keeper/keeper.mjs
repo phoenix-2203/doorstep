@@ -2,14 +2,35 @@
 //
 //   RPC_URL=https://rpc.mainnet.arc.io \
 //   DOORSTEP=0x... FROM_BLOCK=<deploy block> \
-//   KEEPER_PRIVATE_KEY=0x... node keeper.mjs
+//   KEEPER_KEYSTORE=~/.foundry/keystores/<name> node keeper.mjs      (asks for the password)
+//
+// Signing key, in order of preference:
+//   KEEPER_KEYSTORE      a Foundry / Web3 Secret Storage keystore file; password from
+//                        KEEPER_PASSWORD_FILE, or typed in at start-up
+//   KEEPER_PRIVATE_KEY   a raw key (only for throwaway keeper wallets)
+// With neither, it runs read-only and just reports what it would land.
 //
 // Anyone can run this. The keeper is repaid its gas (capped per intent) out of each deposit.
-// Without KEEPER_PRIVATE_KEY it runs read-only and just reports what it would land.
+// Use a separate keeper wallet holding a little USDC for gas, not your main wallet.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import { createPublicClient, createWalletClient, http, defineChain, parseGwei, formatUnits } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
+import { decryptKeystore, askHidden } from './keystore.mjs';
+
+
+async function loadAccount() {
+  if (process.env.KEEPER_KEYSTORE) {
+    const file = process.env.KEEPER_KEYSTORE.replace(/^~(?=\/)/, os.homedir());
+    const password = process.env.KEEPER_PASSWORD_FILE
+      ? fs.readFileSync(process.env.KEEPER_PASSWORD_FILE.replace(/^~(?=\/)/, os.homedir()), 'utf8').replace(/\r?\n$/, '')
+      : await askHidden(`Keystore password for ${file}: `);
+    return privateKeyToAccount(decryptKeystore(fs.readFileSync(file, 'utf8'), password));
+  }
+  if (process.env.KEEPER_PRIVATE_KEY) return privateKeyToAccount(process.env.KEEPER_PRIVATE_KEY);
+  return null;
+}
 
 const abi = JSON.parse(fs.readFileSync(new URL('./abi.json', import.meta.url))).Doorstep;
 
@@ -32,7 +53,7 @@ const arc = defineChain({
 });
 
 const pub = createPublicClient({ chain: arc, transport: http(RPC_URL) });
-const account = process.env.KEEPER_PRIVATE_KEY ? privateKeyToAccount(process.env.KEEPER_PRIVATE_KEY) : null;
+const account = await loadAccount();
 const wallet = account ? createWalletClient({ chain: arc, transport: http(RPC_URL), account }) : null;
 
 const realChain = await pub.getChainId();

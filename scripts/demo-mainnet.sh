@@ -11,7 +11,9 @@
 #   3. Native send 0.05 USDC to the deposit address, then land it   -> Landed
 #   4. ERC-20 transfer 0.05 USDC to the SAME address, then land it -> Landed (address reused)
 #   5. A short-expiry intent: send 0.03 USDC, wait for expiry, land -> Bounced back to you
-#   6. Withdraw your escrow credit back to your wallet
+#   6. (Doorstep v2+) Early cancel: send 0.02 USDC to an intent with a 1 USDC minimum, cancel it
+#      at once from the refund wallet -> Bounced (cancelled), every wei back
+#   7. Withdraw your escrow credit back to your wallet
 # Every transaction hash is written to mainnet-proof.txt.
 set -euo pipefail
 
@@ -135,8 +137,29 @@ land "land B (expired -> bounce)" "$INTENT_B"
 [ "$(credit "$ME")" = "$c2" ] || die "escrow credit changed on a bounce"
 echo "   Bounced. Refunded to $ME"
 
-# --- 6. withdraw from the escrow -------------------------------------------------------------
-say "6. Withdraw your escrow credit ($c2) back to your wallet"
+# --- 6. early cancel (v2+) -------------------------------------------------------------------
+if arc-cast call "$DOOR" "NEW_ACCOUNT_GAS()(uint256)" --rpc-url "$RPC" >/dev/null 2>&1; then
+  say "6. Early cancel: pay less than the minimum, then take it back at once"
+  REF_C=$(arc-cast format-bytes32-string "doorstep-cancel-demo")
+  INTENT_C="($ESCROW,$CALLDATA,4,$ME,1000000,10000,$EXP_A,$REF_C)"
+  DEP_C=$(arc-cast call "$DOOR" "addressOf($INTENT_T)(address)" "$INTENT_C" --rpc-url "$RPC")
+  echo "   deposit address: $DEP_C (minimum 1 USDC)"
+  echo "deposit address C: $DEP_C (minimum 1 USDC)" >> "$PROOF"
+  tx "native send 0.02 to C" "$DEP_C" --value 0.02ether
+  if arc-cast estimate "$DOOR" "land($INTENT_T)" "$INTENT_C" --from "$ME" --rpc-url "$RPC" >/dev/null 2>&1; then
+    die "landing below the minimum should revert"
+  fi
+  echo "   land reverts (below minimum): the money waits"
+  tx "cancel C (refund wallet takes it back)" "$DOOR" "cancel($INTENT_T)" "$INTENT_C" --gas-limit 300000
+  [ "$(outcome "$LAST_TX")" = Bounced ] || die "expected Bounced (cancelled)"
+  [ "$(arc-cast balance "$DEP_C" --rpc-url "$RPC")" = "0" ] || die "deposit address not empty after cancel"
+  echo "   Cancelled. 0.02 USDC back to $ME, no delivery fee"
+else
+  say "6. Early cancel: skipped (this Doorstep is v1, which has no cancel)"
+fi
+
+# --- 7. withdraw from the escrow -------------------------------------------------------------
+say "7. Withdraw your escrow credit ($c2) back to your wallet"
 tx "escrow withdraw" "$ESCROW" "withdraw(uint256,address)" "$c2" "$ME"
 
 say "Done"

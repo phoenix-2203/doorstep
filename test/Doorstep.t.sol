@@ -400,6 +400,86 @@ contract DoorstepTest is Test {
         }
     }
 
+    // ------------------------------------------------------------ early cancel
+
+    function test_cancelRefundsBeforeExpiry() public {
+        Doorstep.Intent memory i = _escrowIntent(); // min 1 USDC, expires in a day
+        address dep = door.addressOf(i);
+        _sendNative(dep, 0.5 ether); // below the minimum: cannot land yet
+
+        vm.expectEmit(true, true, true, true, address(door));
+        emit Doorstep.Bounced(
+            door.intentHash(i), i.ref, refundAddr, dep, Doorstep.BounceReason.Cancelled, 0.5 ether, 0, ""
+        );
+        vm.prank(refundAddr, refundAddr);
+        uint256 refunded = door.cancel(i);
+
+        assertEq(refunded, 0.5 ether, "returns what it refunded");
+        assertEq(refundAddr.balance, 0.5 ether, "every wei back, no keeper fee");
+        assertEq(dep.balance, 0, "address emptied");
+        assertEq(dep.code.length, 0, "address codeless again");
+        assertEq(escrow.balanceOf6(alice), 0, "nothing delivered");
+        assertEq(address(door).balance, 0, "factory holds nothing");
+    }
+
+    function test_cancelAfterExpiryAlsoWorks() public {
+        Doorstep.Intent memory i = _escrowIntent();
+        _sendNative(door.addressOf(i), 2 ether);
+        vm.warp(i.expiry + 1);
+        vm.prank(refundAddr, refundAddr);
+        assertEq(door.cancel(i), 2 ether);
+        assertEq(refundAddr.balance, 2 ether);
+    }
+
+    function test_onlyRefundToCanCancel() public {
+        Doorstep.Intent memory i = _escrowIntent();
+        address dep = door.addressOf(i);
+        _sendNative(dep, 2 ether);
+
+        address[3] memory others = [keeper, payer, alice];
+        for (uint256 k = 0; k < others.length; k++) {
+            vm.prank(others[k], others[k]);
+            vm.expectRevert(Doorstep.NotRefundTo.selector);
+            door.cancel(i);
+        }
+        assertEq(dep.balance, 2 ether, "funds untouched");
+    }
+
+    function test_cancelWithNothingWaitingReverts() public {
+        vm.prank(refundAddr, refundAddr);
+        vm.expectRevert(Doorstep.NothingToLand.selector);
+        door.cancel(_escrowIntent());
+    }
+
+    function test_cancelErc20Deposit() public {
+        Doorstep.Intent memory i = _escrowIntent();
+        address dep = door.addressOf(i);
+        vm.prank(payer);
+        USDC.transfer(dep, 1_234_567); // 1.234567 USDC through the ERC-20 interface
+        vm.prank(refundAddr, refundAddr);
+        assertEq(door.cancel(i), 1_234_567 * SCALE);
+        assertEq(refundAddr.balance, 1_234_567 * SCALE);
+    }
+
+    function test_cancelInvalidIntentReverts() public {
+        Doorstep.Intent memory i = _escrowIntent();
+        i.target = USDC_ADDR;
+        vm.prank(refundAddr, refundAddr);
+        vm.expectRevert(Doorstep.InvalidIntent.selector);
+        door.cancel(i);
+    }
+
+    function test_cancelToBlocklistedRefundToKeepsFunds() public {
+        Doorstep.Intent memory i = _escrowIntent();
+        address dep = door.addressOf(i);
+        _sendNative(dep, 3 ether);
+        _blocklist(refundAddr);
+        vm.prank(refundAddr, refundAddr);
+        vm.expectRevert();
+        door.cancel(i);
+        assertEq(dep.balance, 3 ether, "nothing moved");
+    }
+
     // ------------------------------------------------------------ Arc blocklist
 
     function test_blocklistedRefundToKeepsFundsAtAddress() public {

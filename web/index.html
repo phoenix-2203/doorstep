@@ -107,8 +107,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .log li { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .log .ok { color: var(--landed); font-weight: 600; }
 .log .no { color: var(--bounced); font-weight: 600; }
+#bots .ok { color: var(--landed); font-weight: 600; }
 a { color: var(--door); }
 .note { font-size: 14px; color: var(--ink-2); margin-top: 18px; }
+.intro { color: var(--ink-2); margin: -4px 0 18px; max-width: 60ch; }
+.plain { background: var(--paper-2); border-left: 3px solid var(--door); border-radius: 6px; padding: 12px 14px; margin: 4px 0 0; font-size: 15px; }
+.plain.dim { color: var(--ink-2); }
 .msg { min-height: 1.5em; font-size: 14px; margin-top: 10px; }
 .msg.err { color: var(--bounced); }
 section + section { margin-top: 36px; }
@@ -134,43 +138,49 @@ footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
         <div class="knob" aria-hidden="true"></div>
       </div>
       <section>
-        <h2>Where should arriving USDC go?</h2>
+        <h2>Set up your payment address</h2>
+        <p class="intro">Answer these and you get an address. Anyone who sends USDC on Arc to it pays into the contract you pick. These answers are the address's <i>instructions</i>; nobody can change them later.</p>
         <form id="intent-form">
-          <label>Contract to fund
-            <span class="hint">Defaults to the demo escrow. It must pull funds with transferFrom.</span>
-            <input class="mono" name="target" required pattern="^0x[0-9a-fA-F]{40}$">
+          <label>1. Which contract should the money go into?
+            <span class="hint">The vault, escrow or app that should receive it. It's filled in with our demo escrow so you can try it.</span>
+            <input class="mono" name="target" required pattern="^0x[0-9a-fA-F]{40}$" autocomplete="off">
           </label>
-          <label>Credit this address
-            <span class="hint">Who the escrow credits for each deposit.</span>
-            <input class="mono" name="beneficiary" required pattern="^0x[0-9a-fA-F]{40}$">
+          <label>2. Who should it be credited to?
+            <span class="hint">The account the contract records the payment for, usually your customer or you.</span>
+            <input class="mono" name="beneficiary" required pattern="^0x[0-9a-fA-F]{40}$" placeholder="0x…" autocomplete="off">
           </label>
-          <label>Refund to
-            <span class="hint">Your own wallet. Never an exchange deposit address: refunds sent there can be lost.</span>
-            <input class="mono" name="refundTo" required pattern="^0x[0-9a-fA-F]{40}$">
+          <label>3. If it can't be delivered, where should it go back to?
+            <span class="hint">A wallet you control. This wallet can also cancel and take the money back at any time. Never an exchange deposit address.</span>
+            <input class="mono" name="refundTo" required pattern="^0x[0-9a-fA-F]{40}$" placeholder="0x…" autocomplete="off">
           </label>
+          <div class="actions"><button type="button" class="quiet" id="btn-mine">Use my wallet for 2 and 3</button></div>
           <div class="row">
-            <label>Minimum deposit (USDC)
+            <label>4. Wait until at least this much has arrived (USDC)
+              <span class="hint">Smaller payments wait at the address until the total reaches this. 0 delivers any amount.</span>
               <input name="min" type="number" step="0.000001" min="0" value="0.05" required>
             </label>
-            <label>Keeper fee cap (USDC)
+            <label>5. Delivery fee limit (USDC)
+              <span class="hint">Delivering costs a small network fee, usually under $0.01, taken from the payment. This is the most it can ever be.</span>
               <input name="fee" type="number" step="0.000001" min="0" value="0.01" required>
             </label>
           </div>
           <div class="row">
-            <label>Expires
+            <label>6. Stop accepting after
+              <span class="hint">After this, anything still waiting goes back instead of being delivered.</span>
               <select name="expiry">
-                <option value="3600">In 1 hour</option>
-                <option value="86400" selected>In 1 day</option>
-                <option value="604800">In 7 days</option>
-                <option value="2592000">In 30 days</option>
+                <option value="3600">1 hour</option>
+                <option value="86400" selected>1 day</option>
+                <option value="604800">7 days</option>
+                <option value="2592000">30 days</option>
               </select>
             </label>
-            <label>Reference
-              <span class="hint">Order or invoice id, up to 31 characters.</span>
+            <label>7. Your reference (optional)
+              <span class="hint">An order or invoice number, shown in the records. Up to 31 characters.</span>
               <input name="ref" maxlength="31" value="order-1">
             </label>
           </div>
-          <div class="actions"><button type="submit">Create address</button></div>
+          <p class="plain dim" id="plain" aria-live="polite"></p>
+          <div class="actions"><button type="submit">Create my address</button></div>
           <p class="msg" id="create-msg" role="status"></p>
         </form>
       </section>
@@ -180,7 +190,7 @@ footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
   <!-- Pay / status view -->
   <div id="pay-view" hidden>
     <p class="lede" id="pay-lede">Send USDC on Arc to this address.</p>
-    <p class="sub">Use any wallet's Send button or an exchange withdrawal on the Arc network. It is credited within seconds once a keeper lands it.</p>
+    <p class="sub">Use any wallet's Send button or an exchange withdrawal on the Arc network. Once it's delivered, it shows here.</p>
     <div class="stage">
       <div class="door" id="door" data-state="idle" aria-live="polite">
         <span class="light"><span class="bulb"></span><span id="light-text">Waiting for a deposit</span></span>
@@ -193,6 +203,7 @@ footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
       <div>
         <section>
           <h2>What this address does</h2>
+          <p class="plain" id="plain-pay"></p>
           <dl class="facts" id="facts"></dl>
           <p class="note">This page recomputes the address from these terms itself. If any term changed, the address would change too.</p>
         </section>
@@ -200,10 +211,13 @@ footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
           <h2>Actions</h2>
           <div class="actions">
             <button id="btn-pay" type="button">Send from my wallet</button>
-            <button id="btn-land" class="quiet" type="button">Land it now</button>
-            <button id="btn-announce" class="quiet" type="button">Announce to keepers</button>
+            <button id="btn-land" class="quiet" type="button">Deliver now</button>
+            <button id="btn-cancel" class="quiet" type="button">Cancel and refund</button>
+            <button id="btn-announce" class="quiet" type="button">Tell delivery bots</button>
             <button id="btn-copy" class="quiet" type="button">Copy link</button>
           </div>
+          <p class="note" id="bots"></p>
+          <p class="note"><b>Deliver now</b> moves what's waiting into the contract; anyone can press it, and the network fee comes out of the payment. <b>Cancel and refund</b> works only from the refund wallet.</p>
           <p class="msg" id="pay-msg" role="status"></p>
         </section>
         <section>
@@ -218,7 +232,7 @@ footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
     </div>
   </div>
 
-  <footer>Doorstep is unaudited. Use small amounts. Source and tests: <a id="repo-link" href="#">repository</a>.</footer>
+  <footer>Doorstep is unaudited. Use small amounts. Source and tests: <a id="repo-link" href="https://github.com/phoenix-2203/doorstep">repository</a>.</footer>
 </div>
 <script type="module" src="./app.js"></script>
 </body>

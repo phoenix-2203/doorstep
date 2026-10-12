@@ -1,9 +1,9 @@
-import {
-  createPublicClient, createWalletClient, custom, http, defineChain,
-  encodeAbiParameters, keccak256, getContractAddress, encodeFunctionData,
-  parseUnits, formatUnits, stringToHex, hexToString, isAddress, getAddress,
-} from 'viem';
+import { createWalletClient, custom, parseUnits, isAddress, getAddress } from 'viem';
 import qrcode from 'qrcode-generator';
+import {
+  createDoorstep, depositIntent, describe, explain, parseLink, toLink, formatUsdc6, formatUsdc18,
+  DoorstepError, DOORSTEP_ABI,
+} from '../sdk/src/index.js';
 import { CONFIG, TESTNET } from './config.js';
 
 // ---------------------------------------------------------------- config
@@ -12,72 +12,37 @@ const params = new URLSearchParams(location.search);
 const chainId = Number(params.get('chain') ?? CONFIG.chainId);
 const base = chainId === TESTNET.chainId ? { ...CONFIG, ...TESTNET } : { ...CONFIG };
 const net = { ...base, rpcUrl: params.get('rpc') ?? base.rpcUrl, chainId };
-const DOORSTEP = getAddress(params.get('doorstep') ?? CONFIG.doorstep);
 const ESCROW = getAddress(params.get('escrow') ?? CONFIG.escrow);
-const LOG_SPAN = 9000n; // public RPC rejects eth_getLogs over 10,000 blocks
+const legacy = (CONFIG.legacy ?? []).map((l) => ({ ...l, doorstep: getAddress(l.doorstep) }));
 
-const chain = defineChain({
-  id: chainId,
-  name: chainId === 5042 ? 'Arc' : chainId === 5042002 ? 'Arc Testnet' : 'Local Arc node',
-  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-  rpcUrls: { default: { http: [net.rpcUrl] } },
-  blockExplorers: { default: { name: 'Arcscan', url: net.explorer } },
+// Which Doorstep a link belongs to: explicit ?doorstep=, else v1 for links made before the current
+// deployment, else the current one.
+function doorstepFor(fromBlock) {
+  if (params.get('doorstep')) return getAddress(params.get('doorstep'));
+  const current = getAddress(CONFIG.doorstep);
+  if (fromBlock !== undefined && fromBlock < BigInt(CONFIG.deployBlock)) {
+    const old = legacy.filter((l) => BigInt(l.deployBlock) <= fromBlock).sort((a, b) => b.deployBlock - a.deployBlock)[0];
+    if (old) return old.doorstep;
+  }
+  return current;
+}
+const isLegacy = (addr) => legacy.some((l) => l.doorstep === addr);
+
+const clientFor = (doorstep, fromBlock) => createDoorstep({
+  chainId, rpcUrl: net.rpcUrl, explorer: net.explorer, doorstep, fromBlock: fromBlock ?? BigInt(CONFIG.deployBlock),
 });
-const pub = createPublicClient({ chain, transport: http(net.rpcUrl) });
-const { Doorstep: DOOR_ABI, DemoEscrow: ESCROW_ABI } = await (await fetch('./abi.json')).json();
-
-const INTENT_COMPONENTS = [
-  { name: 'target', type: 'address' },
-  { name: 'callData', type: 'bytes' },
-  { name: 'amountOffset', type: 'uint32' },
-  { name: 'refundTo', type: 'address' },
-  { name: 'minAmount6', type: 'uint256' },
-  { name: 'maxKeeperFee6', type: 'uint256' },
-  { name: 'expiry', type: 'uint64' },
-  { name: 'ref', type: 'bytes32' },
-];
 
 const $ = (id) => document.getElementById(id);
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
-const usdc6 = (v) => formatUnits(BigInt(v), 6);
-const usdc18 = (v) => formatUnits(BigInt(v), 18);
-$('net').innerHTML = `<b>${chain.name}</b> · chain ${chainId}`;
+const chainName = chainId === 5042 ? 'Arc' : chainId === 5042002 ? 'Arc Testnet' : 'Local Arc node';
+$('net').innerHTML = `<b>${chainName}</b> · chain ${chainId}`;
 const link = (path, text) => `<a href="${net.explorer}/${path}" target="_blank" rel="noopener">${text}</a>`;
-
-// ---------------------------------------------------------------- intent maths (mirrors the contract)
-
-function intentHash(i) {
-  return keccak256(encodeAbiParameters([{ type: 'tuple', components: INTENT_COMPONENTS }], [i]));
-}
-
-let landerCodeHash;
-async function depositAddressOf(i) {
-  landerCodeHash ??= await pub.readContract({ address: DOORSTEP, abi: DOOR_ABI, functionName: 'LANDER_CODE_HASH' });
-  return getContractAddress({ opcode: 'CREATE2', from: DOORSTEP, salt: intentHash(i), bytecodeHash: landerCodeHash });
-}
-
-// Intents travel in the URL fragment, so the link alone is enough to verify and pay.
-const toB64 = (s) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-const fromB64 = (s) => atob(s.replace(/-/g, '+').replace(/_/g, '/'));
-function encodeIntent(i, fromBlock) {
-  return toB64(JSON.stringify({ ...i, minAmount6: i.minAmount6.toString(), maxKeeperFee6: i.maxKeeperFee6.toString(), expiry: i.expiry.toString(), b: fromBlock.toString() }));
-}
-function decodeIntent(s) {
-  const o = JSON.parse(fromB64(s));
-  return {
-    intent: {
-      target: getAddress(o.target), callData: o.callData, amountOffset: Number(o.amountOffset),
-      refundTo: getAddress(o.refundTo), minAmount6: BigInt(o.minAmount6), maxKeeperFee6: BigInt(o.maxKeeperFee6),
-      expiry: BigInt(o.expiry), ref: o.ref,
-    },
-    fromBlock: BigInt(o.b ?? CONFIG.deployBlock),
-  };
-}
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------------------------------------------------------------- wallet
 
 let wallet;
-async function connect() {
+async function connect(ds) {
   if (!window.ethereum) throw new Error('No browser wallet found. Install one, or send from any wallet to the address shown.');
   const hexId = '0x' + chainId.toString(16);
   try {
@@ -86,11 +51,11 @@ async function connect() {
     if (e.code !== 4902) throw e;
     await window.ethereum.request({
       method: 'wallet_addEthereumChain',
-      params: [{ chainId: hexId, chainName: chain.name, nativeCurrency: chain.nativeCurrency, rpcUrls: [net.rpcUrl], blockExplorerUrls: [net.explorer] }],
+      params: [{ chainId: hexId, chainName, nativeCurrency: ds.chain.nativeCurrency, rpcUrls: [net.rpcUrl], blockExplorerUrls: [net.explorer] }],
     });
   }
   const [account] = await window.ethereum.request({ method: 'eth_requestAccounts' });
-  wallet = createWalletClient({ chain, transport: custom(window.ethereum), account: getAddress(account) });
+  wallet = createWalletClient({ chain: ds.chain, transport: custom(window.ethereum), account: getAddress(account) });
   return wallet;
 }
 
@@ -106,108 +71,142 @@ function renderQr(el, text) {
 
 // ---------------------------------------------------------------- create view
 
+function namesFor(intent, { you } = {}) {
+  const n = {};
+  if (getAddress(intent.target) === ESCROW) n[ESCROW] = 'the demo escrow';
+  if (you) n[getAddress(you)] = 'you';
+  return n;
+}
+
 async function initCreate() {
+  const ds = clientFor(doorstepFor());
   const f = $('intent-form');
   f.target.value = ESCROW;
+
+  const read = () => {
+    for (const k of ['target', 'beneficiary', 'refundTo']) {
+      if (!isAddress(f[k].value.trim())) throw new DoorstepError(`missing:${k}`);
+    }
+    return depositIntent({
+      into: f.target.value.trim(),
+      beneficiary: f.beneficiary.value.trim(),
+      refundTo: f.refundTo.value.trim(),
+      minimum: f.min.value || '0',
+      keeperFeeCap: f.fee.value || '0',
+      expires: `${Number(f.expiry.value)}s`,
+      reference: f.ref.value || '',
+    });
+  };
+
+  // Live plain-language preview of the instruction as it's being filled in.
+  const preview = () => {
+    const box = $('plain');
+    try {
+      const i = read();
+      box.innerHTML = `<b>In plain words:</b> ${esc(describe(i, { names: namesFor(i, { you: wallet?.account.address }) }))}`;
+      box.classList.remove('dim');
+    } catch (e) {
+      const which = { target: 'the contract', beneficiary: 'who gets credited', refundTo: 'the refund wallet' }[String(e.message).split(':')[1]];
+      box.innerHTML = which ? `<b>In plain words:</b> fill in ${which} to see what this address will do.` : `<b>Check this:</b> ${esc(e.message)}`;
+      box.classList.add('dim');
+    }
+  };
+  f.addEventListener('input', preview);
+  preview();
+
+  $('btn-mine').onclick = async () => {
+    try {
+      const w = await connect(ds);
+      f.beneficiary.value ||= w.account.address;
+      f.refundTo.value = w.account.address;
+      preview();
+    } catch (e) {
+      $('create-msg').className = 'msg err';
+      $('create-msg').textContent = e.shortMessage ?? e.message;
+    }
+  };
+
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const msg = $('create-msg');
     msg.className = 'msg';
     msg.textContent = 'Working out the address…';
     try {
-      for (const k of ['target', 'beneficiary', 'refundTo']) if (!isAddress(f[k].value)) throw new Error(`${k} is not an address`);
-      const block = await pub.getBlock();
-      const intent = {
-        target: getAddress(f.target.value),
-        callData: encodeFunctionData({ abi: ESCROW_ABI, functionName: 'deposit', args: [0n, getAddress(f.beneficiary.value)] }),
-        amountOffset: 4, // first argument of deposit(uint256,address)
-        refundTo: getAddress(f.refundTo.value),
-        minAmount6: parseUnits(f.min.value || '0', 6),
-        maxKeeperFee6: parseUnits(f.fee.value || '0', 6),
-        expiry: block.timestamp + BigInt(f.expiry.value),
-        ref: stringToHex(f.ref.value || '', { size: 32 }),
-      };
+      const block = await ds.publicClient.getBlock();
+      // Expiry counts from the chain's clock, not this computer's.
+      const intent = { ...read(), expiry: block.timestamp + BigInt(f.expiry.value) };
       // Cross-check the browser's maths against the contract before handing out an address.
-      const [local, onchain] = await Promise.all([
-        depositAddressOf(intent),
-        pub.readContract({ address: DOORSTEP, abi: DOOR_ABI, functionName: 'addressOf', args: [intent] }),
-      ]);
-      if (local !== onchain) throw new Error('Address mismatch between page and contract. Not safe to use.');
-      location.hash = 'i=' + encodeIntent(intent, block.number);
+      const onchain = await ds.publicClient.readContract({ address: ds.doorstep, abi: DOORSTEP_ABI, functionName: 'addressOf', args: [intent] });
+      if (ds.depositAddress(intent) !== onchain) throw new Error('Address mismatch between page and contract. Not safe to use.');
+      location.hash = toLink(intent, { baseUrl: '', fromBlock: block.number }).split('#')[1];
     } catch (e) {
       msg.className = 'msg err';
-      msg.textContent = e.shortMessage ?? e.message;
+      msg.textContent = String(e.message).startsWith('missing:') ? 'Fill in all three addresses first.' : (e.shortMessage ?? e.message);
     }
   });
 }
 
 // ---------------------------------------------------------------- pay / status view
 
-async function initPay(encoded) {
+async function initPay(fragment) {
   $('create-view').hidden = true;
   $('pay-view').hidden = false;
-  const { intent, fromBlock } = decodeIntent(encoded);
-  const hash = intentHash(intent);
-  const dep = await depositAddressOf(intent);
+  const { intent, fromBlock } = parseLink('#' + fragment);
+  const doorAddr = doorstepFor(fromBlock);
+  const ds = clientFor(doorAddr, fromBlock);
+  const cancellable = !isLegacy(doorAddr);
+  const dep = ds.depositAddress(intent);
+  const ex = explain(intent);
   const isEscrow = intent.target === ESCROW;
-  let beneficiary;
-  if (isEscrow) beneficiary = getAddress('0x' + intent.callData.slice(2 + 8 + 64 + 24, 2 + 8 + 128));
 
   $('addr').textContent = dep;
   renderQr($('qr'), dep);
-  const refText = hexToString(intent.ref, { size: 32 }).replace(/\0+$/, '');
-  if (refText) $('pay-lede').textContent = `Pay ${refText} with USDC on Arc.`;
+  if (ex.reference) $('pay-lede').textContent = `Pay ${ex.reference} with USDC on Arc.`;
+  $('plain-pay').innerHTML = `<b>In plain words:</b> ${esc(describe(intent, { names: namesFor(intent), cancellable }))}`;
 
-  const expiryDate = new Date(Number(intent.expiry) * 1000);
   $('facts').innerHTML = [
-    ['Deposits into', `${link('address/' + intent.target, short(intent.target))}${isEscrow ? ' (demo escrow)' : ''}`],
-    beneficiary ? ['Credits', `<span class="mono">${beneficiary}</span>`] : null,
-    ['Refunds to', `<span class="mono">${intent.refundTo}</span>`],
-    ['Minimum', `${usdc6(intent.minAmount6)} USDC`],
-    ['Keeper fee', `at most ${usdc6(intent.maxKeeperFee6)} USDC, repaid from the deposit`],
-    ['Expires', `${expiryDate.toLocaleString()} (after that, deposits are refunded)`],
-    refText ? ['Reference', refText] : null,
-    ['Intent hash', `<span class="mono">${hash}</span>`],
+    ['Pays into', `${link('address/' + intent.target, short(intent.target))}${isEscrow ? ' (demo escrow)' : ''}`],
+    ex.beneficiary ? ['Credits', `<span class="mono">${ex.beneficiary}</span>`] : ['Call', `<span class="mono">${esc(ex.call.text)}</span>`],
+    ['Money goes back to', `<span class="mono">${intent.refundTo}</span>`],
+    ['Waits for at least', `${ex.minimum} USDC`],
+    ['Delivery fee limit', `${ex.keeperFeeCap} USDC, taken from the deposit`],
+    ['Stops accepting', `${ex.expiresAt.toLocaleString()}`],
+    ex.reference ? ['Reference', esc(ex.reference)] : null,
+    ['Doorstep contract', `${link('address/' + doorAddr, short(doorAddr))}${cancellable ? '' : ' (v1, no cancel)'}`],
   ].filter(Boolean).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
   if (isEscrow) $('escrow-box').hidden = false;
+  $('btn-cancel').hidden = !cancellable;
 
   const door = $('door');
-  const events = [];
+  let events = [];
   let cursor = fromBlock;
   async function refresh() {
-    const [bal, head] = await Promise.all([pub.getBalance({ address: dep }), pub.getBlockNumber()]);
-    while (cursor <= head) {
-      const to = cursor + LOG_SPAN - 1n < head ? cursor + LOG_SPAN - 1n : head;
-      for (const eventName of ['Landed', 'Bounced']) {
-        const logs = await pub.getContractEvents({ address: DOORSTEP, abi: DOOR_ABI, eventName, args: { intentHash: hash }, fromBlock: cursor, toBlock: to });
-        events.push(...logs);
-      }
-      cursor = to + 1n;
+    const [st, head] = await Promise.all([ds.status(intent), ds.publicClient.getBlockNumber({ cacheTime: 0 })]);
+    if (cursor <= head) {
+      events = events.concat(await ds.history(intent, { fromBlock: cursor, toBlock: head }));
+      cursor = head + 1n;
     }
-    events.sort((a, b) => Number(b.blockNumber - a.blockNumber));
-    $('amount').innerHTML = `${Number(usdc18(bal)).toLocaleString(undefined, { maximumFractionDigits: 6 })}<small>USDC waiting</small>`;
-    const last = events[0];
-    if (bal > 0n) {
+    const newest = [...events].reverse();
+    $('amount').innerHTML = `${Number(st.waiting).toLocaleString(undefined, { maximumFractionDigits: 6 })}<small>USDC waiting</small>`;
+    const last = newest[0];
+    if (st.waitingRaw > 0n) {
       door.dataset.state = 'arrived';
-      $('light-text').textContent = 'Deposit arrived, landing…';
+      $('light-text').textContent = st.belowMinimum ? 'Waiting for the minimum' : st.expired ? 'Arrived, will be refunded' : 'Arrived, ready to deliver';
     } else if (last) {
-      door.dataset.state = last.eventName === 'Landed' ? 'landed' : 'bounced';
-      $('light-text').textContent = last.eventName === 'Landed' ? 'Landed' : 'Refunded';
+      door.dataset.state = last.event === 'Landed' ? 'landed' : 'bounced';
+      $('light-text').textContent = last.event === 'Landed' ? 'Delivered' : last.reasonText === 'cancelled' ? 'Cancelled and refunded' : 'Refunded';
     } else {
       door.dataset.state = 'idle';
-      $('light-text').textContent = 'Waiting for a deposit';
+      $('light-text').textContent = st.expired ? 'Expired' : 'Waiting for a payment';
     }
-    $('log').innerHTML = events.length
-      ? events.map((e) => {
-          const a = e.args;
-          return e.eventName === 'Landed'
-            ? `<li><span class="ok">Landed</span> ${usdc6(a.amountPulled6)} USDC into ${short(a.target)}; keeper repaid ${usdc18(a.keeperFee)} USDC${a.refunded > 0n ? `, ${usdc18(a.refunded)} returned` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`
-            : `<li><span class="no">Refunded</span> ${usdc18(a.refunded)} USDC to ${short(a.refundTo)} (${a.reason === 0 ? 'expired' : 'target call failed'}); keeper repaid ${usdc18(a.keeperFee)} USDC. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`;
-        }).join('')
-      : '<li>No landings yet.</li>';
-    if (isEscrow) {
-      const c = await pub.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [beneficiary] });
-      $('credited').textContent = `${usdc6(c)} USDC`;
+    $('log').innerHTML = newest.length
+      ? newest.map((e) => (e.event === 'Landed'
+        ? `<li><span class="ok">Delivered</span> ${formatUsdc6(e.amountPulled6)} USDC into ${short(e.target)}. Delivery fee ${formatUsdc18(e.keeperFee)} USDC${e.refunded > 0n ? `, ${formatUsdc18(e.refunded)} returned` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`
+        : `<li><span class="no">${e.reasonText === 'cancelled' ? 'Cancelled' : 'Refunded'}</span> ${formatUsdc18(e.refunded)} USDC back to ${short(e.refundTo)}${e.reasonText === 'cancelled' ? '' : ` (${e.reasonText})`}${e.keeperFee > 0n ? `. Delivery fee ${formatUsdc18(e.keeperFee)} USDC` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`)).join('')
+      : '<li>Nothing delivered or refunded yet.</li>';
+    if (isEscrow && ex.beneficiary) {
+      const c = await ds.publicClient.readContract({ address: ESCROW, abi: [{ type: 'function', name: 'balanceOf6', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] }], functionName: 'balanceOf6', args: [ex.beneficiary] });
+      $('credited').textContent = `${formatUsdc6(c)} USDC`;
     }
   }
 
@@ -217,31 +216,46 @@ async function initPay(encoded) {
   };
 
   $('btn-pay').onclick = run(async () => {
-    const amount = prompt('How much USDC to send?', usdc6(intent.minAmount6 > 0n ? intent.minAmount6 : 100000n));
+    const amount = prompt('How much USDC to send?', ex.minimum !== '0' ? ex.minimum : '0.1');
     if (!amount) return;
-    const w = await connect();
+    const w = await connect(ds);
     // A plain native transfer: exactly what a wallet's Send button does.
     const tx = await w.sendTransaction({ to: dep, value: parseUnits(amount, 18) });
     $('pay-msg').innerHTML = `Sent. ${link('tx/' + tx, 'View transaction')}`;
   });
   $('btn-land').onclick = run(async () => {
-    const w = await connect();
-    // Estimate with a real gas price (at price 0 the fee transfer is skipped and the estimate is short).
-    const block = await pub.getBlock();
-    const maxFeePerGas = block.baseFeePerGas * 2n;
-    const est = await pub.estimateContractGas({ address: DOORSTEP, abi: DOOR_ABI, functionName: 'land', args: [intent], account: w.account, maxFeePerGas, maxPriorityFeePerGas: 0n });
-    const tx = await w.writeContract({ address: DOORSTEP, abi: DOOR_ABI, functionName: 'land', args: [intent], gas: (est * 13n) / 10n + 30_000n, maxFeePerGas, maxPriorityFeePerGas: 0n });
-    $('pay-msg').innerHTML = `Landing submitted. ${link('tx/' + tx, 'View transaction')}`;
+    const w = await connect(ds);
+    say('Delivering…');
+    const { hash, event } = await ds.land(intent, { walletClient: w });
+    $('pay-msg').innerHTML = `${event?.event === 'Landed' ? 'Delivered.' : 'Refunded.'} ${link('tx/' + hash, 'View transaction')}`;
+    refresh();
+  });
+  $('btn-cancel').onclick = run(async () => {
+    const w = await connect(ds);
+    if (w.account.address !== intent.refundTo) throw new Error(`Only the refund wallet (${short(intent.refundTo)}) can cancel. Connect that wallet.`);
+    say('Cancelling…');
+    const { hash, event } = await ds.cancel(intent, { walletClient: w });
+    $('pay-msg').innerHTML = `Cancelled. ${formatUsdc18(event.refunded)} USDC sent back. ${link('tx/' + hash, 'View transaction')}`;
+    refresh();
   });
   $('btn-announce').onclick = run(async () => {
-    const w = await connect();
-    const tx = await w.writeContract({ address: DOORSTEP, abi: DOOR_ABI, functionName: 'announce', args: [intent] });
-    $('pay-msg').innerHTML = `Announced. Keepers can now find this address. ${link('tx/' + tx, 'View transaction')}`;
+    const w = await connect(ds);
+    const { hash } = await ds.announce(intent, { walletClient: w });
+    $('pay-msg').innerHTML = `Announced. Delivery bots can now find this address. ${link('tx/' + hash, 'View transaction')}`;
+    showAnnounced().catch(() => {});
   });
   $('btn-copy').onclick = run(async () => {
     await navigator.clipboard.writeText(location.href);
     say('Link copied.');
   });
+
+  const showAnnounced = async () => {
+    const yes = await ds.isAnnounced(intent, { fromBlock });
+    $('bots').innerHTML = yes
+      ? '<span class="ok">Delivery bots know about this address.</span> Payments are delivered automatically while a bot is running.'
+      : 'Delivery bots don\'t know about this address yet. Press <b>Tell delivery bots</b> once (costs a fraction of a cent) so payments are delivered automatically, or press <b>Deliver now</b> after each payment.';
+  };
+  showAnnounced().catch(() => {});
 
   const loop = async () => {
     try { await refresh(); } catch (e) { say(`Couldn't reach Arc: ${e.shortMessage ?? e.message}`, true); }
@@ -253,7 +267,7 @@ async function initPay(encoded) {
 // ---------------------------------------------------------------- boot
 
 const route = () => {
-  const m = location.hash.match(/^#i=(.+)$/);
+  const m = location.hash.match(/^#(i=.+)$/);
   if (m) initPay(m[1]).catch((e) => { $('pay-msg').className = 'msg err'; $('pay-msg').textContent = e.message; });
   else initCreate();
 };

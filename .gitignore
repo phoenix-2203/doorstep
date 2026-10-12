@@ -8,3 +8,4 @@ web/node_modules/
 broadcast/*/dry-run/
 *.zip
 .DS_Store
+sdk/node_modules/

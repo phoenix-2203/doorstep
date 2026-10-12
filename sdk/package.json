@@ -1,0 +1,19 @@
+{
+  "name": "doorstep-arc",
+  "version": "0.1.0",
+  "description": "Deposit addresses that fund any Arc contract on arrival: build, explain, watch, land and cancel Doorstep intents.",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": { ".": { "types": "./src/index.d.ts", "default": "./src/index.js" } },
+  "files": ["src", "README.md"],
+  "scripts": {
+    "test": "node --test test/unit.test.mjs",
+    "test:local": "node --test test/local.test.mjs"
+  },
+  "keywords": ["arc", "usdc", "circle", "deposit-address", "payments", "create2"],
+  "repository": { "type": "git", "url": "https://github.com/phoenix-2203/doorstep", "directory": "sdk" },
+  "license": "MIT",
+  "peerDependencies": { "viem": "^2.21.0" },
+  "devDependencies": { "viem": "2.57.4" }
+}
