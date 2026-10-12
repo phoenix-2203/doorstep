@@ -15,6 +15,10 @@
 #      at once from the refund wallet -> Bounced (cancelled), every wei back
 #   7. Withdraw your escrow credit back to your wallet
 # Every transaction hash is written to mainnet-proof.txt.
+#
+# ONLY=cancel runs just the early-cancel step (plus the checks it needs).
+# The checks look at each transaction's own events, so other activity on the same wallet
+# (for example a delivery bot crediting your savings address in the same vault) can't confuse them.
 set -euo pipefail
 
 RPC="${RPC:-https://rpc.mainnet.arc.io}"
@@ -25,6 +29,7 @@ ACCT="${ACCT:-doorstep-deployer}"
 USDC=0x3600000000000000000000000000000000000000
 EXPECT_CHAIN="${EXPECT_CHAIN:-5042}"
 PROOF="${PROOF:-mainnet-proof.txt}"
+ONLY="${ONLY:-}"
 
 INTENT_T='(address,bytes,uint32,address,uint256,uint256,uint64,bytes32)'
 LANDED_T0=$(arc-cast keccak "Landed(bytes32,bytes32,address,address,uint256,uint256,uint256)")
@@ -82,6 +87,15 @@ outcome() {
 
 land() { tx "$1" "$DOOR" "land($INTENT_T)" "$2" --gas-limit 600000; }
 
+# Did this transaction deposit anything into the escrow? (Looks only at that transaction.)
+touched_escrow() {
+  arc-cast receipt "$1" --rpc-url "$RPC" --json | tr 'A-F' 'a-f' | grep -q "\"address\":\"$(printf '%s' "$ESCROW" | tr 'A-F' 'a-f')\""
+}
+
+CALLDATA=$(arc-cast calldata "deposit(uint256,address)" 0 "$ME")
+EXP_A=1798761600   # 2027-01-01T00:00:00Z
+
+if [ "$ONLY" != cancel ]; then
 # --- 1. the problem --------------------------------------------------------------------------
 say "1. Plain wallet send straight to the escrow"
 if est=$(arc-cast estimate "$ESCROW" --value 0.01ether --from "$ME" --rpc-url "$RPC" 2>&1); then
@@ -93,9 +107,7 @@ echo "plain send to escrow: reverts (eth_estimateGas)" >> "$PROOF"
 
 # --- 2. intent A -----------------------------------------------------------------------------
 say "2. Announce an intent: deposit into DemoEscrow for $ME"
-CALLDATA=$(arc-cast calldata "deposit(uint256,address)" 0 "$ME")
 REF_A=$(arc-cast format-bytes32-string "doorstep-mainnet-demo")
-EXP_A=1798761600   # 2027-01-01T00:00:00Z
 INTENT_A="($ESCROW,$CALLDATA,4,$ME,10000,10000,$EXP_A,$REF_A)"
 DEP_A=$(arc-cast call "$DOOR" "addressOf($INTENT_T)(address)" "$INTENT_A" --rpc-url "$RPC")
 echo "   deposit address: $DEP_A"
@@ -134,8 +146,9 @@ printf '   waiting for expiry'
 while [ "$(arc-cast block latest -f timestamp --rpc-url "$RPC")" -le "$EXP_B" ]; do printf '.'; sleep 5; done; echo
 land "land B (expired -> bounce)" "$INTENT_B"
 [ "$(outcome "$LAST_TX")" = Bounced ] || die "expected Bounced"
-[ "$(credit "$ME")" = "$c2" ] || die "escrow credit changed on a bounce"
-echo "   Bounced. Refunded to $ME"
+if touched_escrow "$LAST_TX"; then die "the bounce transaction deposited into the escrow"; fi
+echo "   Bounced. Refunded to $ME (nothing went into the escrow)"
+fi  # ONLY != cancel
 
 # --- 6. early cancel (v2+) -------------------------------------------------------------------
 if arc-cast call "$DOOR" "NEW_ACCOUNT_GAS()(uint256)" --rpc-url "$RPC" >/dev/null 2>&1; then
@@ -152,6 +165,7 @@ if arc-cast call "$DOOR" "NEW_ACCOUNT_GAS()(uint256)" --rpc-url "$RPC" >/dev/nul
   echo "   land reverts (below minimum): the money waits"
   tx "cancel C (refund wallet takes it back)" "$DOOR" "cancel($INTENT_T)" "$INTENT_C" --gas-limit 300000
   [ "$(outcome "$LAST_TX")" = Bounced ] || die "expected Bounced (cancelled)"
+  if touched_escrow "$LAST_TX"; then die "the cancel transaction deposited into the escrow"; fi
   [ "$(arc-cast balance "$DEP_C" --rpc-url "$RPC")" = "0" ] || die "deposit address not empty after cancel"
   echo "   Cancelled. 0.02 USDC back to $ME, no delivery fee"
 else
@@ -159,8 +173,11 @@ else
 fi
 
 # --- 7. withdraw from the escrow -------------------------------------------------------------
-say "7. Withdraw your escrow credit ($c2) back to your wallet"
-tx "escrow withdraw" "$ESCROW" "withdraw(uint256,address)" "$c2" "$ME"
+c_now=$(credit "$ME")
+if [ "$c_now" != 0 ]; then
+  say "7. Withdraw your escrow credit ($c_now) back to your wallet"
+  tx "escrow withdraw" "$ESCROW" "withdraw(uint256,address)" "$c_now" "$ME"
+fi
 
 say "Done"
 echo "   Doorstep balance: $(bal "$DOOR") USDC (should be 0)"
