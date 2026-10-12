@@ -126,7 +126,8 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | Web app: plain-language preview, create address, QR, waiting-for-minimum, cancelled, delivered, mobile layout | headless Chromium against the local node | works |
 | Page and contract compute the same deposit address | `test_addressMatchesViemVector` | equal |
 | The same tests against live Arc mainnet state | `arc-forge test --fork-url https://rpc.mainnet.arc.io` | all pass (v1, 25 tests) |
-| Live run on Arc mainnet: deploy, native send lands, ERC-20 transfer to the same address lands, expired intent bounces | `scripts/demo-mainnet.sh` | all pass, see [Mainnet proof](#mainnet-proof) |
+| Live runs on Arc mainnet: native send lands, ERC-20 transfer to the same address lands, expired intent bounces, early cancel refunds (v2) | `scripts/demo-mainnet.sh` | all pass, see [Mainnet proof](#mainnet-proof) |
+| Live site on mainnet: a visitor's savings address, paid from a wallet, delivered automatically by the bot | https://phoenix-2203.github.io/doorstep/ + `keeper/` | delivered, see [Mainnet proof](#mainnet-proof) |
 
 Arc's USDC system contracts used in the tests are generated from `circlefin/arc-node`'s genesis. The USDC proxy and implementation bytecode are identical in the localdev and mainnet genesis files.
 
@@ -192,13 +193,35 @@ Put the deployed addresses and deploy block in `web/config.js` before building, 
 
 ## Mainnet proof
 
-v1 was deployed and exercised on Arc mainnet on 2026-10-11 (UTC) with `scripts/demo-mainnet.sh`; v2 was deployed on 2026-10-12. The rows below the deploys are the v1 run, which uses only `arc-cast` and a local encrypted keystore. The script checks every receipt's status and the Doorstep event it emitted, and stops at the first mismatch. All steps passed.
+Everything below can be checked on the Arc mainnet explorer. The scripted runs use `scripts/demo-mainnet.sh`, which uses only `arc-cast` and a local encrypted keystore, checks every receipt's status and the Doorstep event it emitted, and stops at the first mismatch.
+
+### v2 (current), 2026-10-12
+
+| Step | What happened | Transaction |
+| --- | --- | --- |
+| Deploy | `Doorstep` v2 (adds `cancel`), block 25509432, 1,449,011 gas, [`0x56BD0FEf…6229`](https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229) | [`0x32ad069f…`](https://explorer.arc.io/tx/0x32ad069f5b54f137e035aef60526340d20af5bd8d58b06cf264415dfbfcf4a27) |
+| **Live site, automatic delivery** | A savings address created on the live site was paid 0.05 USDC from a wallet; the delivery bot ([`0xd6aA9A15…4497`](https://explorer.arc.io/address/0xd6aA9A15e5a95754F8B02a08A0C3E3CA7E614497)) found it from the `Announced` log and delivered it into the vault on its own. The bot's balance went from 0.1 to 0.10007536 USDC: the fee repaid its gas. | [`0x9213c520…`](https://explorer.arc.io/tx/0x9213c520cdfb052882a5710e5c8eb54bb0a58d509c42223a7de998bcc670d554) |
+| The problem | A plain wallet send straight to `DemoEscrow` reverts (`eth_estimateGas`) | n/a |
+| Announce | Intent: deposit into `DemoEscrow` for the wallet; deposit address [`0x6d9766Df…0d58`](https://explorer.arc.io/address/0x6d9766DfE372778d08Ad001F847f686505280d58) | [`0xfb9c076d…`](https://explorer.arc.io/tx/0xfb9c076daeb226699a77506cff23654a6748750202dcedb66ca88076a7fb3b96) |
+| Pay (native send) | 0.05 USDC, like any wallet transfer | [`0xf33d4804…`](https://explorer.arc.io/tx/0xf33d4804d1ef01690cdada40ff0f88cf714f97d2bbca8ac4bcce0c6cc8536771) |
+| Land → **Landed** | 0.045168 USDC credited in the escrow | [`0xd63b709b…`](https://explorer.arc.io/tx/0xd63b709b84ecc249cb99c5e03e3036c8b2c949056826929e92cfde93af086c2b) |
+| Pay (ERC-20 transfer) | 0.05 USDC via `USDC.transfer` to the **same address**, later transaction | [`0x7ee45cf0…`](https://explorer.arc.io/tx/0x7ee45cf0a6eeb02d1391d8a82ed7e15bf6b93d8f6f078166680a8e85f8978575) |
+| Land → **Landed** | Address reused; credit 0.045168 → 0.090336 USDC | [`0xb7e0ac45…`](https://explorer.arc.io/tx/0xb7e0ac45a364e6cd72ea6ef355f9742e9ba81c4008728ee96ed9204f8c754462) |
+| Pay (expiring intent) | 0.03 USDC to [`0xB96c1e0B…71D2`](https://explorer.arc.io/address/0xB96c1e0B71569f6203F345ca31221BeEa5DD71D2), which expires 45 s later | [`0xa1b52953…`](https://explorer.arc.io/tx/0xa1b52953cb1c04bd9089c3dbbcb8801ab1dbd669e03cfcff1326757bbbf53ee5) |
+| Land → **Bounced (expired)** | Refunded to `refundTo`; nothing goes into the escrow | [`0x97ee485e…`](https://explorer.arc.io/tx/0x97ee485e195221a22e25f5e4ac7349d72eab01e783b5212c90675f068fb01b40) |
+| Pay below the minimum | 0.02 USDC to [`0x773854A0…799d`](https://explorer.arc.io/address/0x773854A08124ed61f03160ED9a85Ffce33Dd799d), whose minimum is 1 USDC; `land` reverts, so it waits | [`0x919d8205…`](https://explorer.arc.io/tx/0x919d8205a35d4c7edb75d42f537238bf0876b7fd6038881daee2ff5d23075e45) |
+| **Cancel → Bounced (cancelled)** | The refund wallet takes the 0.02 USDC back at once, no fee | [`0x2466b10c…`](https://explorer.arc.io/tx/0x2466b10c4c9dd1419fc140aaa2eb3f0b94dc7ec05b43d94826396c83803038b4) |
+
+After each run Doorstep's balance is exactly 0. In the scripted run one wallet plays payer, keeper and beneficiary; in the live-site run the payer and the delivery bot are different wallets.
+
+### v1, 2026-10-11
+
+v1 was deployed and exercised on Arc mainnet on 2026-10-11 (UTC) with `scripts/demo-mainnet.sh`, which uses only `arc-cast` and a local encrypted keystore. The script checks every receipt's status and the Doorstep event it emitted, and stops at the first mismatch. All steps passed.
 
 | Step | What happened | Transaction |
 | --- | --- | --- |
 | Deploy | `Doorstep`, block 25488972, 1,257,811 gas | [`0x26ed6f67…`](https://explorer.arc.io/tx/0x26ed6f676fa6b86140ce919376ca7086148d4a734a8bf94be6b9fd2e39dd3836) |
 | Deploy | `DemoEscrow`, block 25488973, 367,095 gas | [`0x4ac68483…`](https://explorer.arc.io/tx/0x4ac68483dac76c69cba4345049f845b217315b46c4f3c14d518fa8d205583509) |
-| Deploy v2 | `Doorstep` v2 (adds `cancel`), block 25509432, 1,449,011 gas | [`0x32ad069f…`](https://explorer.arc.io/tx/0x32ad069f5b54f137e035aef60526340d20af5bd8d58b06cf264415dfbfcf4a27) |
 | The problem | A plain wallet send of USDC straight to `DemoEscrow` reverts (`eth_estimateGas`) | n/a |
 | Announce | Intent: deposit into `DemoEscrow` for the wallet, refunds to the wallet. Deposit address [`0xEB95f51A…1788a`](https://explorer.arc.io/address/0xEB95f51A3A2c2A931983FDB10939cfb102E1788a) | [`0x7ce28911…`](https://explorer.arc.io/tx/0x7ce28911df29ac79f78219c41d13abe3f8d8e941a2da7362e7feac5d1eb04d83) |
 | Pay (native send) | 0.05 USDC sent to the deposit address like any wallet transfer | [`0x460b05a5…`](https://explorer.arc.io/tx/0x460b05a5def97439d547fb83f3f208e40a7019b7d19a12a2e90033d416484b5d) |
