@@ -25,7 +25,34 @@ export const NO_AMOUNT = 0xffffffff;
 export const AMOUNT = 0xd00257e9d00257e9d00257e9d00257e9d00257e9d00257e9d00257e9d00257e9n;
 
 const SCALE = 10n ** 12n; // native units per 6-decimal unit
-const LOG_SPAN = 9000n; // Arc RPCs cap eth_getLogs at 10,000 blocks
+const LOG_SPAN = 9000n; // Arc RPCs cap eth_getLogs at 10,000 blocks; some refuse less (see scanLogs)
+
+const isRangeLimit = (e) => /limit|range|too many|exceed|too large|10000|response size/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+
+/**
+ * Run `fetchRange(from, to)` over [fromBlock, toBlock] in chunks, shrinking the chunk whenever the
+ * RPC refuses a range ("Request exceeds defined limit", "query exceeds max block range", …) and
+ * growing it back after successes. Results are concatenated in block order.
+ */
+export async function scanLogs(fetchRange, fromBlock, toBlock, { span = LOG_SPAN, minSpan = 50n, onProgress } = {}) {
+  const out = [];
+  let size = BigInt(span);
+  let from = BigInt(fromBlock);
+  const end = BigInt(toBlock);
+  while (from <= end) {
+    const to = from + size - 1n < end ? from + size - 1n : end;
+    try {
+      out.push(...await fetchRange(from, to));
+      onProgress?.(to);
+      from = to + 1n;
+      if (size < BigInt(span)) size = size * 2n > BigInt(span) ? BigInt(span) : size * 2n;
+    } catch (e) {
+      if (!isRangeLimit(e) || size <= minSpan) throw e;
+      size = size / 2n < minSpan ? minSpan : size / 2n;
+    }
+  }
+  return out;
+}
 
 export const NETWORKS = {
   arc: { id: 5042, name: 'Arc', rpcUrl: 'https://rpc.mainnet.arc.io', explorer: 'https://explorer.arc.io' },
@@ -373,14 +400,14 @@ export function createDoorstep(opts = {}) {
   async function history(intent, { fromBlock = fromBlockDefault, toBlock } = {}) {
     const h = intentHash(intent);
     const head = toBlock ?? await pub.getBlockNumber({ cacheTime: 0 });
-    const out = [];
-    for (let from = BigInt(fromBlock); from <= head; from += LOG_SPAN) {
-      const to = from + LOG_SPAN - 1n < head ? from + LOG_SPAN - 1n : head;
+    const out = await scanLogs(async (from, to) => {
+      const found = [];
       for (const eventName of ['Landed', 'Bounced']) {
         const logs = await pub.getContractEvents({ address: DOOR, abi: DOORSTEP_ABI, eventName, args: { intentHash: h }, fromBlock: from, toBlock: to });
-        out.push(...logs.map(decodeEvent));
+        found.push(...logs.map(decodeEvent));
       }
-    }
+      return found;
+    }, fromBlock, head);
     return out.sort((a, b) => (a.blockNumber < b.blockNumber ? -1 : a.blockNumber > b.blockNumber ? 1 : 0));
   }
 
@@ -388,12 +415,17 @@ export function createDoorstep(opts = {}) {
   async function isAnnounced(intent, { fromBlock = fromBlockDefault } = {}) {
     const h = intentHash(intent);
     const head = await pub.getBlockNumber({ cacheTime: 0 });
-    for (let from = BigInt(fromBlock); from <= head; from += LOG_SPAN) {
-      const to = from + LOG_SPAN - 1n < head ? from + LOG_SPAN - 1n : head;
-      const logs = await pub.getContractEvents({ address: DOOR, abi: DOORSTEP_ABI, eventName: 'Announced', args: { intentHash: h }, fromBlock: from, toBlock: to });
-      if (logs.length) return true;
+    // Newest first: an address registered recently is found without scanning all history.
+    let found = false;
+    let to = head;
+    const start = BigInt(fromBlock);
+    while (!found && to >= start) {
+      const from = to - LOG_SPAN + 1n > start ? to - LOG_SPAN + 1n : start;
+      const logs = await scanLogs((a, b) => pub.getContractEvents({ address: DOOR, abi: DOORSTEP_ABI, eventName: 'Announced', args: { intentHash: h }, fromBlock: a, toBlock: b }), from, to);
+      found = logs.length > 0;
+      to = from - 1n;
     }
-    return false;
+    return found;
   }
 
   /** What is waiting at the address right now, and what can be done with it. */

@@ -177,6 +177,8 @@ export function fromRef(ref: Hex): string;
 export function formatUsdc6(v: bigint | number | string): string;
 export function formatUsdc18(v: bigint | number | string): string;
 export function explainRevert(err: unknown): unknown;
+/** Chunked log scan that shrinks the block range when the RPC refuses it. */
+export function scanLogs<T>(fetchRange: (from: bigint, to: bigint) => Promise<T[]>, fromBlock: bigint, toBlock: bigint, o?: { span?: bigint; minSpan?: bigint; onProgress?: (to: bigint) => void }): Promise<T[]>;
 
 export class DoorstepError extends Error {
   details?: unknown;

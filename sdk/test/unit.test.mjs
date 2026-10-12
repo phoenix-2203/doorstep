@@ -117,3 +117,18 @@ test('links round-trip, with and without overrides', () => {
   assert.deepEqual(parseLink(link2.split('#i=')[1]).intent, i);
   assert.throws(() => parseLink('https://example.com'), /not a Doorstep link/);
 });
+
+test('scanLogs shrinks the range when the RPC refuses it, and covers every block once', async () => {
+  const { scanLogs } = await import('../src/index.js');
+  const seen = [];
+  const fetchRange = async (from, to) => {
+    if (to - from + 1n > 1200n) throw new Error('Request exceeds defined limit.');
+    for (let b = from; b <= to; b++) seen.push(b);
+    return [Number(from)];
+  };
+  const out = await scanLogs(fetchRange, 100n, 30_099n);
+  assert.equal(seen.length, 30_000);
+  assert.equal(new Set(seen.map(String)).size, 30_000, 'no block scanned twice');
+  assert.ok(out.length > 0);
+  await assert.rejects(scanLogs(async () => { throw new Error('boom'); }, 0n, 10n), /boom/);
+});
