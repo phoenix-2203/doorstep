@@ -71,8 +71,8 @@ export const NETWORKS = {
  */
 export const DEPLOYMENTS = {
   5042: {
-    doorstep: null, // v2 (with cancel): filled in after deployment
-    fromBlock: null,
+    doorstep: '0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229', // v2, with cancel
+    fromBlock: 25509432n,
     legacy: [{ version: 1, doorstep: '0xd614A7B602E1417F258A834465AE01F47891e080', fromBlock: 25488972n }],
     demoEscrow: '0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3',
   },
