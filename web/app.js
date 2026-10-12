@@ -235,7 +235,7 @@ async function initHome() {
     looping = true;
     const tick = async () => {
       try { await refresh(); } catch (e) { say('s4-msg', `Couldn't reach Arc: ${esc(errText(e))}`, true); }
-      setTimeout(tick, 3000);
+      setTimeout(tick, 6000);
     };
     tick();
   }
@@ -460,7 +460,7 @@ async function initPay(fragment) {
 
   const loop = async () => {
     try { await refresh(); } catch (e) { say('pay-msg', `Couldn't reach Arc: ${esc(errText(e))}`, true); }
-    setTimeout(loop, 3000);
+    setTimeout(loop, 6000);
   };
   loop();
 }
