@@ -251,6 +251,17 @@ ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
     </section>
 
     <section>
+      <h2>Or use the hosted API</h2>
+      <p class="intro">No SDK needed: one HTTPS call returns an address and a ready pay page, and a signed webhook tells your server when the money lands. <a href="https://api.104-251-218-80.sslip.io/docs" target="_blank" rel="noopener">API reference</a> · API keys on request (GitHub issue).</p>
+<pre class="code">curl -X POST https://api.104-251-218-80.sslip.io/v1/addresses \
+  -H "Authorization: Bearer $DOORSTEP_KEY" -H "content-type: application/json" \
+  -d '{"into":"0xYourVault","beneficiary":"0xCustomer","refundTo":"0xCustomer",
+       "amount":"25","reference":"inv-1042","webhookUrl":"https://yourapp.com/hooks/doorstep"}'
+
+→ { "address": "0x…", "payLink": "https://…", "registered": true, "invoice": { "state": "unpaid", … } }</pre>
+    </section>
+
+    <section>
       <h2>Make a payment link by hand</h2>
       <p class="intro">For testing: answer these and you get a shareable pay page. Its address delivers into the contract you choose.</p>
       <div class="stage">
