@@ -2,7 +2,7 @@ import { createWalletClient, custom, parseUnits, isAddress, getAddress } from 'v
 import qrcode from 'qrcode-generator';
 import {
   createDoorstep, depositIntent, describe, explain, parseLink, toLink, formatUsdc6, formatUsdc18,
-  DoorstepError, DOORSTEP_ABI,
+  DoorstepError, DOORSTEP_ABI, LANDER_CODE_HASH,
 } from '../sdk/src/index.js';
 import { CONFIG, TESTNET } from './config.js';
 
@@ -14,6 +14,7 @@ const base = chainId === TESTNET.chainId ? { ...CONFIG, ...TESTNET } : { ...CONF
 const net = { ...base, rpcUrl: params.get('rpc') ?? base.rpcUrl, chainId };
 const ESCROW = getAddress(params.get('escrow') ?? CONFIG.escrow);
 const legacy = (CONFIG.legacy ?? []).map((l) => ({ ...l, doorstep: getAddress(l.doorstep) }));
+const CURRENT_FROM = BigInt(params.get('from') ?? CONFIG.deployBlock);
 
 // Which Doorstep a link belongs to: explicit ?doorstep=, else v1 for links made before the current
 // deployment, else the current one.
@@ -29,7 +30,7 @@ function doorstepFor(fromBlock) {
 const isLegacy = (addr) => legacy.some((l) => l.doorstep === addr);
 
 const clientFor = (doorstep, fromBlock) => createDoorstep({
-  chainId, rpcUrl: net.rpcUrl, explorer: net.explorer, doorstep, fromBlock: fromBlock ?? BigInt(CONFIG.deployBlock),
+  chainId, rpcUrl: net.rpcUrl, explorer: net.explorer, doorstep, fromBlock: fromBlock ?? CURRENT_FROM,
 });
 
 const ESCROW_ABI = [
@@ -39,31 +40,44 @@ const ESCROW_ABI = [
 const $ = (id) => document.getElementById(id);
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const chainName = chainId === 5042 ? 'Arc' : chainId === 5042002 ? 'Arc Testnet' : 'Local Arc node';
-$('net').innerHTML = `<b>${chainName}</b> · chain ${chainId}`;
+$('net').innerHTML = `<b>${chainName}</b>`;
 const link = (path, text) => `<a href="${net.explorer}/${path}" target="_blank" rel="noopener">${text}</a>`;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const usd = (s) => Number(s).toLocaleString(undefined, { maximumFractionDigits: 6 });
+const errText = (e) => e?.shortMessage ?? e?.message ?? String(e);
+const say = (id, html, err) => { const el = $(id); el.className = err ? 'msg err' : 'msg'; el.innerHTML = html; };
 
 // ---------------------------------------------------------------- wallet
 
 let wallet;
-async function connect(ds) {
-  if (!window.ethereum) throw new Error('No browser wallet found. Install one, or send from any wallet to the address shown.');
+async function connect(ds, { silent = false } = {}) {
+  if (!window.ethereum) {
+    if (silent) return null;
+    throw new Error('No browser wallet found. Install one (e.g. Rabby or MetaMask), or send to the address from any wallet or exchange.');
+  }
+  if (silent) {
+    // Reuse an earlier approval without any wallet prompt; switch networks only when sending.
+    const accts = await window.ethereum.request({ method: 'eth_accounts' });
+    if (!accts?.length) return null;
+    wallet = createWalletClient({ chain: ds.chain, transport: custom(window.ethereum), account: getAddress(accts[0]) });
+    return wallet;
+  }
   const hexId = '0x' + chainId.toString(16);
   try {
     await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: hexId }] });
   } catch (e) {
-    if (e.code !== 4902) throw e;
+    // 4902: unknown chain. Some wallets wrap it.
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code !== 4902 && !/Unrecognized|not added|unknown chain/i.test(e?.message ?? '')) throw e;
     await window.ethereum.request({
       method: 'wallet_addEthereumChain',
-      params: [{ chainId: hexId, chainName, nativeCurrency: ds.chain.nativeCurrency, rpcUrls: [net.rpcUrl], blockExplorerUrls: [net.explorer] }],
+      params: [{ chainId: hexId, chainName, nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: [net.rpcUrl], blockExplorerUrls: [net.explorer] }],
     });
   }
   const [account] = await window.ethereum.request({ method: 'eth_requestAccounts' });
   wallet = createWalletClient({ chain: ds.chain, transport: custom(window.ethereum), account: getAddress(account) });
   return wallet;
 }
-
-// ---------------------------------------------------------------- QR
 
 function renderQr(el, text) {
   const qr = qrcode(0, 'M');
@@ -73,20 +87,178 @@ function renderQr(el, text) {
   el.querySelector('svg')?.setAttribute('aria-label', `QR code for ${text}`);
 }
 
-// ---------------------------------------------------------------- create view
-
 function namesFor(intent, { you } = {}) {
   const n = {};
-  if (getAddress(intent.target) === ESCROW) n[ESCROW] = 'the demo escrow';
+  if (getAddress(intent.target) === ESCROW) n[ESCROW] = 'the demo savings vault';
   if (you) n[getAddress(you)] = 'you';
   return n;
 }
 
-async function initCreate() {
+async function withdrawAll(ds, owner, msgId, after) {
+  const w = await connect(ds);
+  if (w.account.address !== owner) {
+    throw new Error(`This balance belongs to ${short(owner)}, but your wallet is connected as ${short(w.account.address)}. Switch to that account in your wallet and try again.`);
+  }
+  const amount = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [owner] });
+  if (amount === 0n) throw new Error('Nothing to withdraw yet.');
+  say(msgId, `Withdrawing ${formatUsdc6(amount)} USDC. Confirm in your wallet…`);
+  const hash = await w.writeContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'withdraw', args: [amount, owner] });
+  say(msgId, `Sent, confirming… ${link('tx/' + hash, 'View transaction')}`);
+  const r = await ds.publicClient.waitForTransactionReceipt({ hash });
+  if (r.status !== 'success') throw new Error('The withdrawal failed.');
+  say(msgId, `Done: ${formatUsdc6(amount)} USDC is now in your wallet. ${link('tx/' + hash, 'View transaction')}`);
+  after?.();
+}
+
+// ---------------------------------------------------------------- home: try it
+
+// Each visitor's savings address is fixed: same wallet, same instructions, same address, every visit.
+const SAVINGS_EXPIRY = new Date('2027-12-31T23:59:59Z');
+const savingsIntent = (owner) => depositIntent({
+  into: ESCROW, beneficiary: owner, refundTo: owner,
+  minimum: '0.01', keeperFeeCap: '0.01', expires: SAVINGS_EXPIRY, reference: 'doorstep-savings',
+});
+
+async function initHome() {
+  $('home-view').hidden = false;
+  $('nav-home').setAttribute('aria-current', 'page');
+  const ds = clientFor(getAddress(params.get('doorstep') ?? CONFIG.doorstep));
+  let intent;
+  let dep;
+  let registered = false;
+  let events = [];
+  let cursor = CURRENT_FROM;
+
+  const mark = (n, state) => { $(`s${n}`).classList.remove('done', 'now'); if (state) $(`s${n}`).classList.add(state); };
+
+  async function onConnected(w) {
+    intent = savingsIntent(w.account.address);
+    dep = ds.depositAddress(intent);
+    mark(1, 'done');
+    say('s1-msg', `Connected as <span class="mono">${short(w.account.address)}</span>.`);
+    $('btn-connect').textContent = 'Connected';
+    $('btn-connect').disabled = true;
+    $('home-light').textContent = 'Checking your address…';
+    registered = await ds.isAnnounced(intent);
+    if (registered) showAddress();
+    else {
+      mark(2, 'now');
+      $('btn-create').disabled = false;
+      $('home-light').textContent = 'One step to get your address';
+    }
+    loop();
+  }
+
+  function showAddress() {
+    mark(2, 'done');
+    mark(3, 'now');
+    $('btn-create').disabled = true;
+    $('btn-create').textContent = 'Done';
+    say('s2-msg', `Registered. Your address is ready.`);
+    renderQr($('home-qr'), dep);
+    $('home-addr').textContent = dep;
+    $('home-slot').hidden = false;
+    $('btn-home-pay').disabled = false;
+    $('btn-home-copy').disabled = false;
+    $('home-light').textContent = 'Ready for payments';
+  }
+
+  $('btn-connect').onclick = async () => {
+    try { const w = await connect(ds); await onConnected(w); } catch (e) { say('s1-msg', esc(errText(e)), true); }
+  };
+  $('btn-create').onclick = async () => {
+    try {
+      const w = await connect(ds);
+      say('s2-msg', 'Confirm in your wallet…');
+      const { hash } = await ds.announce(intent, { walletClient: w });
+      registered = true;
+      showAddress();
+      say('s2-msg', `Registered. ${link('tx/' + hash, 'View transaction')}`);
+    } catch (e) {
+      say('s2-msg', `${esc(errText(e))}${/insufficient|funds/i.test(errText(e)) ? ' This wallet needs a little USDC on Arc for the fee.' : ''}`, true);
+    }
+  };
+  $('btn-home-pay').onclick = async () => {
+    try {
+      const amount = prompt('How much USDC to send to your savings address?', '0.05');
+      if (!amount) return;
+      const w = await connect(ds);
+      const tx = await w.sendTransaction({ to: dep, value: parseUnits(amount, 18) });
+      say('s3-msg', `Sent. ${link('tx/' + tx, 'View transaction')}`);
+    } catch (e) { say('s3-msg', esc(errText(e)), true); }
+  };
+  $('btn-home-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(dep); say('s3-msg', 'Address copied. Paste it into any wallet or exchange withdrawal, on the Arc network.'); } catch (e) { say('s3-msg', esc(errText(e)), true); }
+  };
+  $('btn-home-withdraw').onclick = async () => {
+    try { await withdrawAll(ds, intent.refundTo, 's4-msg', refresh); } catch (e) { say('s4-msg', esc(errText(e)), true); }
+  };
+
+  async function refresh() {
+    if (!intent) return;
+    const [st, head, bal] = await Promise.all([
+      ds.status(intent),
+      ds.publicClient.getBlockNumber({ cacheTime: 0 }),
+      ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [intent.refundTo] }),
+    ]);
+    if (cursor <= head) {
+      events = events.concat(await ds.history(intent, { fromBlock: cursor, toBlock: head }));
+      cursor = head + 1n;
+    }
+    $('home-balance').textContent = `${usd(formatUsdc6(bal))} USDC`;
+    $('btn-home-withdraw').disabled = bal === 0n;
+    const door = $('door-home');
+    const last = events[events.length - 1];
+    if (st.waitingRaw > 0n) {
+      door.dataset.state = 'arrived';
+      $('home-light').textContent = 'Payment arrived';
+      $('s4-status').innerHTML = st.belowMinimum
+        ? `${usd(st.waiting)} USDC arrived. That's under the 0.01 USDC minimum, so it waits for more.`
+        : registered ? `${usd(st.waiting)} USDC arrived. Delivering it into your savings…` : `${usd(st.waiting)} USDC arrived.`;
+      mark(3, 'done'); mark(4, 'now');
+    } else if (last) {
+      door.dataset.state = last.event === 'Landed' ? 'landed' : 'bounced';
+      $('home-light').textContent = last.event === 'Landed' ? 'Delivered' : 'Returned';
+      $('s4-status').innerHTML = last.event === 'Landed'
+        ? `Last payment: ${formatUsdc6(last.amountPulled6)} USDC delivered into your savings. Network fee ${usd(formatUsdc18(last.keeperFee))} USDC${last.refunded > 0n ? `; the unused ${usd(formatUsdc18(last.refunded))} USDC of the fee allowance went back to your wallet` : ''}. ${link('tx/' + last.transactionHash, 'View transaction')}`
+        : `Last payment was returned to your wallet (${last.reasonText}). ${link('tx/' + last.transactionHash, 'View transaction')}`;
+      mark(3, 'done'); mark(4, 'done');
+    } else if (registered) {
+      door.dataset.state = 'idle';
+      $('home-light').textContent = 'Ready for payments';
+    }
+  }
+
+  let looping = false;
+  function loop() {
+    if (looping) return;
+    looping = true;
+    const tick = async () => {
+      try { await refresh(); } catch (e) { say('s4-msg', `Couldn't reach Arc: ${esc(errText(e))}`, true); }
+      setTimeout(tick, 3000);
+    };
+    tick();
+  }
+
+  // Already connected on a previous visit? Pick up silently (no wallet prompt).
+  try { const w = await connect(ds, { silent: true }); if (w) await onConnected(w); } catch { /* user can press Connect */ }
+}
+
+// ---------------------------------------------------------------- developers
+
+async function initDev() {
+  $('dev-view').hidden = false;
+  $('nav-dev').setAttribute('aria-current', 'page');
   const ds = clientFor(doorstepFor());
+  $('dev-facts').innerHTML = [
+    ['Doorstep', `${link('address/' + ds.doorstep, ds.doorstep)}${isLegacy(ds.doorstep) ? ' (v1)' : ''}`],
+    ['Demo savings vault', link('address/' + ESCROW, ESCROW)],
+    ['Lander code hash', `<span class="mono">${LANDER_CODE_HASH}</span>`],
+    ['Network', `${chainName}, chain id ${chainId}`],
+  ].map(([k, v]) => `<div><dt>${k}</dt><dd class="mono">${v}</dd></div>`).join('');
+
   const f = $('intent-form');
   f.target.value = ESCROW;
-
   const read = () => {
     for (const k of ['target', 'beneficiary', 'refundTo']) {
       if (!isAddress(f[k].value.trim())) throw new DoorstepError(`missing:${k}`);
@@ -101,8 +273,6 @@ async function initCreate() {
       reference: f.ref.value || '',
     });
   };
-
-  // Live plain-language preview of the instruction as it's being filled in.
   const preview = () => {
     const box = $('plain');
     try {
@@ -124,36 +294,34 @@ async function initCreate() {
       f.beneficiary.value ||= w.account.address;
       f.refundTo.value = w.account.address;
       preview();
-    } catch (e) {
-      $('create-msg').className = 'msg err';
-      $('create-msg').textContent = e.shortMessage ?? e.message;
-    }
+    } catch (e) { say('create-msg', esc(errText(e)), true); }
   };
 
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const msg = $('create-msg');
-    msg.className = 'msg';
-    msg.textContent = 'Working out the address…';
     try {
+      say('create-msg', 'Working out the address…');
       const block = await ds.publicClient.getBlock();
       // Expiry counts from the chain's clock, not this computer's.
       const intent = { ...read(), expiry: block.timestamp + BigInt(f.expiry.value) };
       // Cross-check the browser's maths against the contract before handing out an address.
       const onchain = await ds.publicClient.readContract({ address: ds.doorstep, abi: DOORSTEP_ABI, functionName: 'addressOf', args: [intent] });
       if (ds.depositAddress(intent) !== onchain) throw new Error('Address mismatch between page and contract. Not safe to use.');
+      if (f.announce.checked) {
+        const w = await connect(ds);
+        say('create-msg', 'Confirm the registration in your wallet…');
+        await ds.announce(intent, { walletClient: w });
+      }
       location.hash = toLink(intent, { baseUrl: '', fromBlock: block.number }).split('#')[1];
     } catch (e) {
-      msg.className = 'msg err';
-      msg.textContent = String(e.message).startsWith('missing:') ? 'Fill in all three addresses first.' : (e.shortMessage ?? e.message);
+      say('create-msg', String(e.message).startsWith('missing:') ? 'Fill in all three addresses first.' : esc(errText(e)), true);
     }
   });
 }
 
-// ---------------------------------------------------------------- pay / status view
+// ---------------------------------------------------------------- pay page
 
 async function initPay(fragment) {
-  $('create-view').hidden = true;
   $('pay-view').hidden = false;
   const { intent, fromBlock } = parseLink('#' + fragment);
   const doorAddr = doorstepFor(fromBlock);
@@ -162,24 +330,46 @@ async function initPay(fragment) {
   const dep = ds.depositAddress(intent);
   const ex = explain(intent);
   const isEscrow = intent.target === ESCROW;
+  const targetName = isEscrow ? 'the demo savings vault' : short(intent.target);
 
   $('addr').textContent = dep;
   renderQr($('qr'), dep);
-  if (ex.reference) $('pay-lede').textContent = `Pay ${ex.reference} with USDC on Arc.`;
-  $('plain-pay').innerHTML = `<b>In plain words:</b> ${esc(describe(intent, { names: namesFor(intent), cancellable }))}`;
-
+  $('pay-lede').textContent = ex.reference && ex.reference !== 'doorstep-savings' ? `Pay ${ex.reference}` : `Deposit to ${targetName}`;
+  $('limits').innerHTML = [
+    ex.minimum !== '0' ? `Minimum ${ex.minimum} USDC` : null,
+    `Accepted until ${ex.expiresAt.toLocaleString()}`,
+    'Arc network, USDC only',
+  ].filter(Boolean).join(' · ');
+  $('plain-pay').innerHTML = esc(describe(intent, { names: namesFor(intent), cancellable }));
   $('facts').innerHTML = [
-    ['Pays into', `${link('address/' + intent.target, short(intent.target))}${isEscrow ? ' (demo escrow)' : ''}`],
-    ex.beneficiary ? ['Credits', `<span class="mono">${ex.beneficiary}</span>`] : ['Call', `<span class="mono">${esc(ex.call.text)}</span>`],
-    ['Money goes back to', `<span class="mono">${intent.refundTo}</span>`],
-    ['Waits for at least', `${ex.minimum} USDC`],
-    ['Delivery fee limit', `${ex.keeperFeeCap} USDC, taken from the deposit`],
-    ['Stops accepting', `${ex.expiresAt.toLocaleString()}`],
+    ['Pays into', `${link('address/' + intent.target, short(intent.target))}${isEscrow ? ' (demo savings vault)' : ''}`],
+    ex.beneficiary ? ['Credited to', `<span class="mono">${ex.beneficiary}</span>`] : ['Call', `<span class="mono">${esc(ex.call.text)}</span>`],
+    ['Returned to', `<span class="mono">${intent.refundTo}</span>`],
+    ['Minimum', `${ex.minimum} USDC`],
+    ['Delivery fee limit', `${ex.keeperFeeCap} USDC, taken from the payment`],
+    ['Accepted until', ex.expiresAt.toLocaleString()],
     ex.reference ? ['Reference', esc(ex.reference)] : null,
     ['Doorstep contract', `${link('address/' + doorAddr, short(doorAddr))}${cancellable ? '' : ' (v1, no cancel)'}`],
   ].filter(Boolean).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
-  if (isEscrow) $('escrow-box').hidden = false;
   $('btn-cancel').hidden = !cancellable;
+
+  let registered = false;
+  const showRegistered = async () => {
+    registered = await ds.isAnnounced(intent, { fromBlock });
+    $('btn-announce').hidden = registered;
+    $('bots').innerHTML = registered
+      ? 'This address is registered for automatic delivery.'
+      : 'This address isn\'t registered for automatic delivery. Register it once (under $0.01), or press Deliver now after each payment.';
+  };
+  showRegistered().catch(() => {});
+
+  if (isEscrow && ex.beneficiary) {
+    $('escrow-box').hidden = false;
+    $('escrow-owner').textContent = ex.beneficiary;
+    $('btn-withdraw').onclick = async () => {
+      try { await withdrawAll(ds, ex.beneficiary, 'withdraw-msg', refresh); } catch (e) { say('withdraw-msg', esc(errText(e)), true); }
+    };
+  }
 
   const door = $('door');
   let events = [];
@@ -190,106 +380,86 @@ async function initPay(fragment) {
       events = events.concat(await ds.history(intent, { fromBlock: cursor, toBlock: head }));
       cursor = head + 1n;
     }
-    const newest = [...events].reverse();
-    $('amount').innerHTML = `${Number(st.waiting).toLocaleString(undefined, { maximumFractionDigits: 6 })}<small>USDC waiting</small>`;
-    const last = newest[0];
+    const last = events[events.length - 1];
+    $('amount').innerHTML = `${usd(st.waiting)}<small>USDC waiting</small>`;
+
+    // Timeline: Waiting for payment -> Payment received -> Delivered | Returned
+    const steps = [];
     if (st.waitingRaw > 0n) {
       door.dataset.state = 'arrived';
-      $('light-text').textContent = st.belowMinimum ? 'Waiting for the minimum' : st.expired ? 'Arrived, will be refunded' : 'Arrived, ready to deliver';
+      $('light-text').textContent = 'Payment received';
+      steps.push(['done', 'Waiting for payment']);
+      const note = st.expired ? 'Past its deadline, so it will be returned.'
+        : st.belowMinimum ? `Under the ${ex.minimum} USDC minimum, so it waits for more.`
+          : registered ? 'Delivering automatically, usually within seconds.' : 'Waiting for delivery (see Advanced).';
+      steps.push(['now', `Payment received: ${usd(st.waiting)} USDC`, note]);
+      steps.push(['', st.expired ? `Returned to ${short(intent.refundTo)}` : `Delivered into ${targetName}`]);
     } else if (last) {
-      door.dataset.state = last.event === 'Landed' ? 'landed' : 'bounced';
-      $('light-text').textContent = last.event === 'Landed' ? 'Delivered' : last.reasonText === 'cancelled' ? 'Cancelled and refunded' : 'Refunded';
+      const ok = last.event === 'Landed';
+      door.dataset.state = ok ? 'landed' : 'bounced';
+      $('light-text').textContent = ok ? 'Delivered' : 'Returned';
+      steps.push(['done', 'Waiting for payment']);
+      steps.push(['done', 'Payment received']);
+      steps.push(ok
+        ? ['done', `Delivered ${formatUsdc6(last.amountPulled6)} USDC into ${targetName}`, `Network fee ${formatUsdc18(last.keeperFee)} USDC. ${link('tx/' + last.transactionHash, 'View transaction')}`]
+        : ['bad', `${last.reasonText === 'cancelled' ? 'Cancelled: ' : ''}${formatUsdc18(last.refunded)} USDC returned to ${short(last.refundTo)}`, `${last.reasonText === 'cancelled' ? 'The refund wallet took it back.' : last.reasonText === 'expired' ? 'It arrived after the deadline.' : 'The contract didn\'t accept it.'} ${link('tx/' + last.transactionHash, 'View transaction')}`]);
+      if (!st.expired) steps.push(['', 'Ready for another payment to the same address']);
     } else {
       door.dataset.state = 'idle';
-      $('light-text').textContent = st.expired ? 'Expired' : 'Waiting for a payment';
+      $('light-text').textContent = st.expired ? 'No longer accepting payments' : 'Waiting for payment';
+      steps.push([st.expired ? 'bad' : 'now', st.expired ? 'Expired: payments are no longer accepted' : 'Waiting for payment', st.expired ? '' : 'Send USDC on Arc to the address.']);
+      steps.push(['', 'Payment received']);
+      steps.push(['', `Delivered into ${targetName}`]);
     }
-    $('log').innerHTML = newest.length
-      ? newest.map((e) => (e.event === 'Landed'
-        ? `<li><span class="ok">Delivered</span> ${formatUsdc6(e.amountPulled6)} USDC into ${short(e.target)}. Delivery fee ${formatUsdc18(e.keeperFee)} USDC${e.refunded > 0n ? `, ${formatUsdc18(e.refunded)} returned` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`
-        : `<li><span class="no">${e.reasonText === 'cancelled' ? 'Cancelled' : 'Refunded'}</span> ${formatUsdc18(e.refunded)} USDC back to ${short(e.refundTo)}${e.reasonText === 'cancelled' ? '' : ` (${e.reasonText})`}${e.keeperFee > 0n ? `. Delivery fee ${formatUsdc18(e.keeperFee)} USDC` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`)).join('')
-      : '<li>Nothing delivered or refunded yet.</li>';
+    $('timeline').innerHTML = steps.map(([c, t, small]) => `<li class="${c}">${t}${small ? `<small>${small}</small>` : ''}</li>`).join('');
+
+    $('log').innerHTML = events.length
+      ? [...events].reverse().map((e) => (e.event === 'Landed'
+        ? `<li><span class="ok">Delivered</span> ${formatUsdc6(e.amountPulled6)} USDC into ${short(e.target)}. Network fee ${formatUsdc18(e.keeperFee)} USDC${e.refunded > 0n ? `, ${formatUsdc18(e.refunded)} returned` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`
+        : `<li><span class="no">${e.reasonText === 'cancelled' ? 'Cancelled' : 'Returned'}</span> ${formatUsdc18(e.refunded)} USDC to ${short(e.refundTo)}${e.reasonText === 'cancelled' ? '' : ` (${e.reasonText})`}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`)).join('')
+      : '<li>Nothing yet.</li>';
+
     if (isEscrow && ex.beneficiary) {
-      held = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [ex.beneficiary] });
+      const held = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [ex.beneficiary] });
       $('credited').textContent = `${formatUsdc6(held)} USDC`;
       $('btn-withdraw').disabled = held === 0n;
     }
   }
 
-  // Demo escrow: the credited wallet takes its balance out to itself.
-  let held = 0n;
-  if (isEscrow && ex.beneficiary) {
-    $('escrow-owner').textContent = ex.beneficiary;
-    const wsay = (t, err) => { $('withdraw-msg').className = err ? 'msg err' : 'msg'; $('withdraw-msg').innerHTML = t; };
-    $('btn-withdraw').onclick = async () => {
-      try {
-        const w = await connect(ds);
-        if (w.account.address !== ex.beneficiary) {
-          throw new Error(`Only ${short(ex.beneficiary)} can withdraw this. Your wallet is connected as ${short(w.account.address)}: switch to the credited account in your wallet and try again.`);
-        }
-        const amount = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [ex.beneficiary] });
-        if (amount === 0n) throw new Error('Nothing to withdraw.');
-        wsay(`Withdrawing ${formatUsdc6(amount)} USDC… confirm in your wallet.`);
-        const hash = await w.writeContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'withdraw', args: [amount, w.account.address] });
-        wsay(`Sent, waiting for confirmation… ${link('tx/' + hash, 'View transaction')}`);
-        const r = await ds.publicClient.waitForTransactionReceipt({ hash });
-        if (r.status !== 'success') throw new Error('The withdrawal failed.');
-        wsay(`Done. ${formatUsdc6(amount)} USDC is now in your wallet. ${link('tx/' + hash, 'View transaction')}`);
-        refresh();
-      } catch (e) {
-        wsay(esc(e.shortMessage ?? e.message), true);
-      }
-    };
-  }
-
-  const say = (t, err) => { $('pay-msg').className = err ? 'msg err' : 'msg'; $('pay-msg').textContent = t; };
-  const run = (fn) => async () => {
-    try { await fn(); } catch (e) { say(e.shortMessage ?? e.message, true); }
-  };
-
+  const run = (fn) => async () => { try { await fn(); } catch (e) { say('pay-msg', esc(errText(e)), true); } };
   $('btn-pay').onclick = run(async () => {
     const amount = prompt('How much USDC to send?', ex.minimum !== '0' ? ex.minimum : '0.1');
     if (!amount) return;
     const w = await connect(ds);
     // A plain native transfer: exactly what a wallet's Send button does.
     const tx = await w.sendTransaction({ to: dep, value: parseUnits(amount, 18) });
-    $('pay-msg').innerHTML = `Sent. ${link('tx/' + tx, 'View transaction')}`;
+    say('pay-msg', `Sent. ${link('tx/' + tx, 'View transaction')}`);
   });
+  $('btn-copy').onclick = run(async () => { await navigator.clipboard.writeText(location.href); say('pay-msg', 'Link copied.'); });
   $('btn-land').onclick = run(async () => {
     const w = await connect(ds);
-    say('Delivering…');
+    say('pay-msg', 'Delivering…');
     const { hash, event } = await ds.land(intent, { walletClient: w });
-    $('pay-msg').innerHTML = `${event?.event === 'Landed' ? 'Delivered.' : 'Refunded.'} ${link('tx/' + hash, 'View transaction')}`;
+    say('pay-msg', `${event?.event === 'Landed' ? 'Delivered.' : 'Returned.'} ${link('tx/' + hash, 'View transaction')}`);
     refresh();
   });
   $('btn-cancel').onclick = run(async () => {
     const w = await connect(ds);
-    if (w.account.address !== intent.refundTo) throw new Error(`Only the refund wallet (${short(intent.refundTo)}) can cancel. Connect that wallet.`);
-    say('Cancelling…');
+    if (w.account.address !== intent.refundTo) throw new Error(`Only the refund wallet (${short(intent.refundTo)}) can cancel. Switch to it in your wallet.`);
+    say('pay-msg', 'Cancelling…');
     const { hash, event } = await ds.cancel(intent, { walletClient: w });
-    $('pay-msg').innerHTML = `Cancelled. ${formatUsdc18(event.refunded)} USDC sent back. ${link('tx/' + hash, 'View transaction')}`;
+    say('pay-msg', `Cancelled. ${formatUsdc18(event.refunded)} USDC sent back. ${link('tx/' + hash, 'View transaction')}`);
     refresh();
   });
   $('btn-announce').onclick = run(async () => {
     const w = await connect(ds);
     const { hash } = await ds.announce(intent, { walletClient: w });
-    $('pay-msg').innerHTML = `Announced. Delivery bots can now find this address. ${link('tx/' + hash, 'View transaction')}`;
-    showAnnounced().catch(() => {});
+    say('pay-msg', `Registered for automatic delivery. ${link('tx/' + hash, 'View transaction')}`);
+    showRegistered().catch(() => {});
   });
-  $('btn-copy').onclick = run(async () => {
-    await navigator.clipboard.writeText(location.href);
-    say('Link copied.');
-  });
-
-  const showAnnounced = async () => {
-    const yes = await ds.isAnnounced(intent, { fromBlock });
-    $('bots').innerHTML = yes
-      ? '<span class="ok">Delivery bots know about this address.</span> Payments are delivered automatically while a bot is running.'
-      : 'Delivery bots don\'t know about this address yet. Press <b>Tell delivery bots</b> once (costs a fraction of a cent) so payments are delivered automatically, or press <b>Deliver now</b> after each payment.';
-  };
-  showAnnounced().catch(() => {});
 
   const loop = async () => {
-    try { await refresh(); } catch (e) { say(`Couldn't reach Arc: ${e.shortMessage ?? e.message}`, true); }
+    try { await refresh(); } catch (e) { say('pay-msg', `Couldn't reach Arc: ${esc(errText(e))}`, true); }
     setTimeout(loop, 3000);
   };
   loop();
@@ -299,8 +469,9 @@ async function initPay(fragment) {
 
 const route = () => {
   const m = location.hash.match(/^#(i=.+)$/);
-  if (m) initPay(m[1]).catch((e) => { $('pay-msg').className = 'msg err'; $('pay-msg').textContent = e.message; });
-  else initCreate();
+  if (m) initPay(m[1]).catch((e) => say('pay-msg', esc(errText(e)), true));
+  else if (location.hash === '#developers') initDev();
+  else initHome();
 };
 window.addEventListener('hashchange', () => location.reload());
 route();
