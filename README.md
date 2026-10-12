@@ -4,7 +4,7 @@
 
 - **Try it:** https://phoenix-2203.github.io/doorstep/ (any visitor gets their own savings address on Arc mainnet and can top it up from any wallet or exchange)
 - **Build with it:** the [`doorstep-arc` SDK](sdk/README.md)
-- **Run a delivery bot:** [keeper/README.md](keeper/README.md)
+- **Delivery:** a public delivery bot runs 24/7 for every registered address on Doorstep v2 (wallet [`0xd6aA…4497`](https://explorer.arc.io/address/0xd6aA9A15e5a95754F8B02a08A0C3E3CA7E614497)). Anyone can run another: [keeper/README.md](keeper/README.md)
 - **On Arc mainnet (chain 5042):** Doorstep v2 [`0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229`](https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229) · demo savings vault [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3) · v1 (no cancel, still works for its addresses) [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080)
 
 ## The problem
