@@ -225,8 +225,14 @@ footer { margin-top: 64px; font-size: 13px; color: var(--ink-2); }
           <ul class="log" id="log"><li>No landings yet.</li></ul>
         </section>
         <section id="escrow-box" hidden>
-          <h2>Demo escrow</h2>
-          <dl class="facts"><div><dt>Credited to beneficiary</dt><dd id="credited">0 USDC</dd></div></dl>
+          <h2>Money held in the demo escrow</h2>
+          <p class="note" style="margin-top:0">Delivered payments don't go to a wallet directly. The escrow holds them and records who they belong to. That person withdraws to their wallet whenever they like.</p>
+          <dl class="facts">
+            <div><dt>Belongs to</dt><dd class="mono" id="escrow-owner"></dd></div>
+            <div><dt>Held for them</dt><dd id="credited">0 USDC</dd></div>
+          </dl>
+          <div class="actions" style="margin-top:14px"><button id="btn-withdraw" type="button">Withdraw to my wallet</button></div>
+          <p class="msg" id="withdraw-msg" role="status"></p>
         </section>
       </div>
     </div>
