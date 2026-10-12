@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doorstep API</title>
+<style>
+:root { --paper:#EDF0F2; --ink:#1B2230; --ink2:#4A5465; --line:#C9D1D8; --door:#2C5A86; --code:#0F141B; --codeink:#E7EBEF; --white:#fff; }
+@media (prefers-color-scheme: dark) { :root { --paper:#151A22; --ink:#E7EBEF; --ink2:#A8B2BF; --line:#2E3744; --door:#8DB6DE; --white:#1C232D; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 64px; }
+h1 { font-size: 30px; margin: 0 0 6px; } h2 { margin-top: 40px; font-size: 21px; } h3 { margin-top: 26px; font-size: 17px; }
+p, li { color: var(--ink); } .sub { color: var(--ink2); }
+a { color: var(--door); }
+pre { background: var(--code); color: var(--codeink); padding: 14px 16px; border-radius: 10px; overflow-x: auto; font: 13px/1.55 ui-monospace, "JetBrains Mono", monospace; }
+code { font: 14px ui-monospace, monospace; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; } td, th { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
+th { color: var(--ink2); font-weight: 600; }
+.pill { display:inline-block; background: var(--white); border:1px solid var(--line); border-radius: 99px; padding: 1px 9px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Doorstep API</h1>
+<p class="sub">Create Arc payment addresses that pay straight into your contract, check them, and get a webhook when money lands. Base URL: <code>{{BASE}}</code> · Doorstep contract <code>{{DOORSTEP}}</code> on Arc mainnet.</p>
+<p>The API never holds money. It calculates Doorstep addresses (anyone can recompute them from the instructions), registers them on-chain so delivery bots pick payments up, and reports what the chain says. Prefer no server? Use the <a href="https://github.com/phoenix-2203/doorstep/tree/main/sdk">JavaScript SDK</a> directly.</p>
+
+<h2>Authentication</h2>
+<p>Send your API key in every <code>/v1</code> request:</p>
+<pre>Authorization: Bearer dk_…</pre>
+<p>Keys are issued by whoever runs this API (<code>node admin.mjs new-key &lt;name&gt;</code>). Keep them on your server, never in a web page.</p>
+
+<h2>Create a payment address</h2>
+<p><span class="pill">POST</span> <code>/v1/addresses</code></p>
+<pre>curl -X POST {{BASE}}/v1/addresses \
+  -H "Authorization: Bearer $DOORSTEP_KEY" -H "content-type: application/json" \
+  -d '{
+    "into": "0xYourVault",
+    "beneficiary": "0xCustomer",
+    "refundTo": "0xCustomer",
+    "amount": "25",
+    "reference": "inv-1042",
+    "expires": "7d",
+    "webhookUrl": "https://yourapp.com/hooks/doorstep"
+  }'</pre>
+<table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><code>into</code></td><td>Your contract. It must have <code>deposit(uint256 amount, address beneficiary)</code> and take the funds with <code>transferFrom</code> (any ERC-4626 vault works).</td></tr>
+<tr><td><code>beneficiary</code></td><td>Who your contract credits.</td></tr>
+<tr><td><code>refundTo</code></td><td>Where money goes if it can't be delivered. This wallet can also cancel at any time. Never an exchange deposit address.</td></tr>
+<tr><td><code>amount</code></td><td>Optional. Ask for an exact amount (an invoice): nothing is delivered until all of it has arrived.</td></tr>
+<tr><td><code>minimum</code></td><td>Optional, instead of <code>amount</code>: deliver once at least this much has arrived. Default 0.</td></tr>
+<tr><td><code>expires</code></td><td>Optional: <code>"45m"</code>, <code>"12h"</code>, <code>"30d"</code>, or unix seconds. Default 30 days. After this, anything waiting is returned.</td></tr>
+<tr><td><code>keeperFeeCap</code></td><td>Optional: the most the delivery may cost the payment, in USDC. Default <code>"0.01"</code>. Delivery bots skip addresses that can't repay their gas.</td></tr>
+<tr><td><code>reference</code></td><td>Optional: your order or invoice id, up to 31 characters. Shown on the pay page and in every event.</td></tr>
+<tr><td><code>webhookUrl</code></td><td>Optional: we POST here when a payment is delivered or returned.</td></tr>
+<tr><td><code>call</code></td><td>Advanced, instead of <code>beneficiary</code>: <code>{"abi": [...], "functionName": "topUp", "args": ["AMOUNT", "0x…"]}</code>. <code>"AMOUNT"</code> marks where the arrived amount goes.</td></tr>
+</table>
+<p>Response <code>201</code>:</p>
+<pre>{
+  "address": "0x6d97…0d58",          // show this, or a QR code; payers send USDC on Arc here
+  "payLink": "https://…/#i=…",        // a ready pay page with QR code and live status
+  "description": "USDC sent to this address is deposited into 0x12…34 for 0x56…78. …",
+  "reference": "inv-1042",
+  "expiresAt": "2026-10-19T12:00:00.000Z",
+  "registered": true,                  // delivery bots will pick payments up automatically
+  "registerTxUrl": "https://explorer.arc.io/tx/0x…",
+  "invoice": { "state": "unpaid", "expected": "25", "received": "0", "remaining": "25", "extra": "0" },
+  "intent": { … }                      // the exact on-chain instructions behind the address
+}</pre>
+<p>The same instructions always give the same address; repeating a request returns the existing one.</p>
+
+<h2>Check an address</h2>
+<p><span class="pill">GET</span> <code>/v1/addresses/{address}</code></p>
+<pre>{
+  "state": "delivered",     // waiting | part_paid | below_minimum | delivering | delivered | returned | cancelled | returning | expired
+  "waiting": "0",           // USDC sitting at the address right now
+  "invoice": { "state": "paid", "received": "25", "remaining": "0", … },
+  "events": [ { "type": "delivered", "amount": "24.995", "networkFee": "0.003", "txUrl": "https://explorer.arc.io/tx/0x…" } ]
+}</pre>
+<p><span class="pill">GET</span> <code>/v1/addresses?reference=inv-1042</code> lists your addresses (latest 100).</p>
+
+<h2>Webhooks</h2>
+<p>When a payment to one of your addresses is delivered or returned, we POST JSON to its <code>webhookUrl</code>:</p>
+<pre>{
+  "id": "evt_…",
+  "type": "payment.delivered",          // or "payment.returned"
+  "createdAt": "2026-10-12T20:31:00.000Z",
+  "data": { "address": "0x…", "reference": "inv-1042", "amount": "24.995", "networkFee": "0.003", "tx": "0x…", "txUrl": "…" }
+}</pre>
+<p>Answer with any <code>2xx</code>. Failed deliveries are retried after 30 s, 2 min, 10 min, 30 min and 2 h. Always check the signature:</p>
+<pre>// Node.js
+import crypto from 'node:crypto';
+function verify(rawBody, headers, secret /* whsec_… */) {
+  const ts = headers['x-doorstep-timestamp'];
+  const expected = 'v1=' + crypto.createHmac('sha256', secret).update(`${ts}.${rawBody}`).digest('hex');
+  const given = headers['x-doorstep-signature'] ?? '';
+  const fresh = Math.abs(Date.now() / 1000 - Number(ts)) &lt; 300;
+  return fresh &amp;&amp; given.length === expected.length &amp;&amp; crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+}</pre>
+
+<h2>Errors</h2>
+<p>Errors look like <code>{"error": {"code": "invalid", "message": "refundTo must be an address"}}</code>. Codes: <code>unauthorized</code> (401), <code>invalid</code>, <code>bad_json</code>, <code>bad_webhook</code> (400), <code>not_found</code> (404), <code>exists</code> (409), <code>rate_limited</code> (429), <code>register_failed</code> (502).</p>
+
+<h2>Health</h2>
+<p><span class="pill">GET</span> <code>/v1/health</code> (no key needed) shows the chain, the Doorstep contract and whether registration is on.</p>
+
+<p class="sub" style="margin-top:48px">Doorstep is open source and unaudited; use small amounts. <a href="https://github.com/phoenix-2203/doorstep">github.com/phoenix-2203/doorstep</a></p>
+</div>
+</body>
+</html>
