@@ -139,6 +139,10 @@ async function tryLand(hash, { depositAddress, intent }) {
 }
 
 console.log(`Doorstep keeper on chain ${chainId} (${RPC_URL}), contract ${DOORSTEP}, ${wallet ? 'signing as ' + account.address : 'read-only'}`);
+if (account) {
+  const bal = await pub.getBalance({ address: account.address });
+  console.log(`Bot wallet balance: ${formatUnits(bal, 18)} USDC${bal < 10n ** 16n ? '  (low: send it ~0.1 USDC on Arc for gas; each delivery costs under 0.01 and is repaid)' : ''}`);
+}
 for (;;) {
   try {
     await scan();
