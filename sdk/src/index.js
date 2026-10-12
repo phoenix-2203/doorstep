@@ -34,14 +34,20 @@ const isRangeLimit = (e) => e?.code === -32005 || /limit|range|too many|exceed|t
  * RPC refuses a range ("Request exceeds defined limit", "query exceeds max block range", …) and
  * growing it back after successes. Results are concatenated in block order.
  */
-export async function scanLogs(fetchRange, fromBlock, toBlock, { span = LOG_SPAN, minSpan = 50n, maxWaits = 6, onProgress } = {}) {
+const isRateLimit = (e) => e?.status === 429 || /rate.?limit|too many requests|429/i.test(`${e?.shortMessage ?? ''} ${e?.details ?? ''} ${e?.message ?? ''}`);
+
+export async function scanLogs(fetchRange, fromBlock, toBlock, { span = LOG_SPAN, minSpan = 50n, maxWaits = 6, pauseMs = 0, onProgress } = {}) {
   const out = [];
   let waits = 0;
+  let first = true;
   let size = BigInt(span);
   let from = BigInt(fromBlock);
   const end = BigInt(toBlock);
   while (from <= end) {
     const to = from + size - 1n < end ? from + size - 1n : end;
+    // Space requests out on rate-limited RPCs (Arc's public RPC allows about one per second).
+    if (!first && pauseMs) await new Promise((r) => setTimeout(r, pauseMs));
+    first = false;
     try {
       out.push(...await fetchRange(from, to));
       onProgress?.(to);
@@ -49,9 +55,12 @@ export async function scanLogs(fetchRange, fromBlock, toBlock, { span = LOG_SPAN
       if (size < BigInt(span)) size = size * 2n > BigInt(span) ? BigInt(span) : size * 2n;
     } catch (e) {
       // -32005 also means "too many requests", so wait a little longer each time as well.
-      if (!isRangeLimit(e) || (size <= minSpan && waits >= maxWaits)) throw e;
-      if (size > minSpan) size = size / 2n < minSpan ? minSpan : size / 2n;
-      await new Promise((r) => setTimeout(r, Math.min(500 * 2 ** waits, 8000)));
+      if (!isRangeLimit(e)) throw e;
+      // A range refusal means search fewer blocks (right away); "too many requests", or a range
+      // refusal at the smallest size, means wait a little longer each time.
+      if (!isRateLimit(e) && size > minSpan) { size = size / 2n < minSpan ? minSpan : size / 2n; continue; }
+      if (waits >= maxWaits) throw e;
+      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** waits, 15_000)));
       waits += 1;
       continue;
     }
@@ -413,7 +422,7 @@ export function createDoorstep(opts = {}) {
     rpcUrls: { default: { http: [rpcUrl] } },
     blockExplorers: explorer ? { default: { name: 'Arcscan', url: explorer } } : undefined,
   });
-  const pub = opts.publicClient ?? createPublicClient({ chain, transport: http(rpcUrl) });
+  const pub = opts.publicClient ?? createPublicClient({ chain, transport: http(rpcUrl, opts.retryCount !== undefined ? { retryCount: opts.retryCount } : {}) });
 
   const walletFor = (o) => {
     const w = o?.walletClient ?? opts.walletClient;
@@ -428,7 +437,8 @@ export function createDoorstep(opts = {}) {
   };
 
   /** Past Landed/Bounced events for an intent, oldest first. */
-  async function history(intent, { fromBlock = fromBlockDefault, toBlock } = {}) {
+  const pauseDefault = opts.pauseMs ?? 0;
+  async function history(intent, { fromBlock = fromBlockDefault, toBlock, pauseMs = pauseDefault } = {}) {
     const h = intentHash(intent);
     const head = toBlock ?? await pub.getBlockNumber({ cacheTime: 0 });
     const out = await scanLogs(async (from, to) => {
@@ -438,12 +448,12 @@ export function createDoorstep(opts = {}) {
         found.push(...logs.map(decodeEvent));
       }
       return found;
-    }, fromBlock, head);
+    }, fromBlock, head, { pauseMs });
     return out.sort((a, b) => (a.blockNumber < b.blockNumber ? -1 : a.blockNumber > b.blockNumber ? 1 : 0));
   }
 
   /** Has this intent been announced on-chain (so delivery bots can find it)? */
-  async function isAnnounced(intent, { fromBlock = fromBlockDefault } = {}) {
+  async function isAnnounced(intent, { fromBlock = fromBlockDefault, pauseMs = pauseDefault } = {}) {
     const h = intentHash(intent);
     const head = await pub.getBlockNumber({ cacheTime: 0 });
     // Newest first: an address registered recently is found without scanning all history.
@@ -452,7 +462,8 @@ export function createDoorstep(opts = {}) {
     const start = BigInt(fromBlock);
     while (!found && to >= start) {
       const from = to - LOG_SPAN + 1n > start ? to - LOG_SPAN + 1n : start;
-      const logs = await scanLogs((a, b) => pub.getContractEvents({ address: DOOR, abi: DOORSTEP_ABI, eventName: 'Announced', args: { intentHash: h }, fromBlock: a, toBlock: b }), from, to);
+      const logs = await scanLogs((a, b) => pub.getContractEvents({ address: DOOR, abi: DOORSTEP_ABI, eventName: 'Announced', args: { intentHash: h }, fromBlock: a, toBlock: b }), from, to, { pauseMs });
+      if (pauseMs && !logs.length && from > start) await new Promise((r) => setTimeout(r, pauseMs));
       found = logs.length > 0;
       to = from - 1n;
     }

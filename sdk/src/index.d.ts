@@ -159,6 +159,10 @@ export interface CreateDoorstepOptions {
   chain?: Chain;
   publicClient?: PublicClient;
   walletClient?: WalletClient;
+  /** Pause between log-search requests, for rate-limited RPCs like Arc's public one (ms). */
+  pauseMs?: number;
+  /** HTTP retries per request (viem default 3). */
+  retryCount?: number;
 }
 
 export function createDoorstep(o?: CreateDoorstepOptions): DoorstepClient;
@@ -181,7 +185,7 @@ export function formatUsdc6(v: bigint | number | string): string;
 export function formatUsdc18(v: bigint | number | string): string;
 export function explainRevert(err: unknown): unknown;
 /** Chunked log scan that shrinks the block range when the RPC refuses it. */
-export function scanLogs<T>(fetchRange: (from: bigint, to: bigint) => Promise<T[]>, fromBlock: bigint, toBlock: bigint, o?: { span?: bigint; minSpan?: bigint; onProgress?: (to: bigint) => void }): Promise<T[]>;
+export function scanLogs<T>(fetchRange: (from: bigint, to: bigint) => Promise<T[]>, fromBlock: bigint, toBlock: bigint, o?: { span?: bigint; minSpan?: bigint; maxWaits?: number; pauseMs?: number; onProgress?: (to: bigint) => void }): Promise<T[]>;
 
 export class DoorstepError extends Error {
   details?: unknown;
