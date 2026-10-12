@@ -1,0 +1,23 @@
+# systemd unit for running the Doorstep delivery bot on a Linux VPS.
+# Install (adjust User and the path):
+#   sudo cp doorstep-keeper.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now doorstep-keeper
+#   journalctl -u doorstep-keeper -f        # watch it work
+[Unit]
+Description=Doorstep delivery bot (Arc)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=doorstep
+WorkingDirectory=/home/doorstep/doorstep/keeper
+EnvironmentFile=/home/doorstep/doorstep/keeper/.env
+ExecStart=/usr/bin/env node keeper.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
