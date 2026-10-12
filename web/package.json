@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild app.js --bundle --format=esm --target=es2022 --minify --external:./config.js --alias:viem=./node_modules/viem --outfile=dist/app.js && cp index.html config.js dist/"
+    "build": "node build.mjs"
   },
   "dependencies": {
     "qrcode-generator": "1.4.4",
