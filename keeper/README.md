@@ -56,12 +56,13 @@ Stop it with Ctrl+C.
 
 | Variable | Meaning |
 | --- | --- |
-| `RPC_URL`, `CHAIN_ID` | Arc mainnet by default |
+| `RPC_URL`, `CHAIN_ID` | Your own endpoint, used for deliveries (a few hundred Alchemy compute units each) and as the backup for balance checks |
+| `READ_RPC_URL` | Used for watching: log searches and one batched balance check (Multicall3) per round. Default: Arc's public RPC, which allows 9,000-block searches, so a free private plan isn't used up by watching |
 | `DOORSTEP`, `FROM_BLOCK` | Which Doorstep contract to deliver for, and its deploy block |
 | `KEEPER_KEYSTORE` | The bot's Foundry keystore file |
 | `KEEPER_PASSWORD_FILE` | Password file for unattended runs; empty means "ask at start" |
 | `KEEPER_PRIVATE_KEY` | Alternative to a keystore, for throwaway wallets only |
-| `POLL_MS` | How often it checks, in milliseconds (default 2000) |
+| `POLL_MS` | How often it checks, in milliseconds (default 3000) |
 | `STATE_FILE` | Where it remembers registered addresses (default `keeper-state-<contract>.json`, one per Doorstep contract) |
 
 With no wallet configured it runs read-only and prints what it would deliver.
