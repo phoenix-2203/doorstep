@@ -274,6 +274,10 @@ ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
             <input class="mono" name="refundTo" required pattern="^0x[0-9a-fA-F]{40}$" placeholder="0x…" autocomplete="off">
           </label>
           <div class="actions"><button type="button" class="quiet" id="btn-mine">Use my wallet for 2 and 3</button></div>
+          <label>Ask for an exact amount (USDC, optional)
+            <span class="hint">For invoices. The pay page then says "Pay 25 USDC", shows how much has arrived and how much is still missing, and nothing is delivered until it's all there.</span>
+            <input name="amount" type="number" step="0.000001" min="0" placeholder="e.g. 25">
+          </label>
           <div class="row">
             <label>4. Wait until at least this much has arrived (USDC)
               <span class="hint">0 delivers any amount.</span>
@@ -371,6 +375,6 @@ ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
 
   <footer>Doorstep is unaudited and new. Use small amounts. <a href="https://github.com/phoenix-2203/doorstep">Source, tests and mainnet proof</a>.</footer>
 </div>
-<script type="module" src="./app-ZENDU2WU.js"></script>
+<script type="module" src="./app-UTV2SJ3X.js"></script>
 </body>
 </html>
