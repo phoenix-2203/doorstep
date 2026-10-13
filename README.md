@@ -118,6 +118,8 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | `web/` | Static site built on the SDK: landing page with an instruction inspector and live mainnet activity (`index.html`, `landing.js`), and the app with the live demo, pay pages and payment-link tool (`app/`, `app.js`). `cd web && npm i && node build.mjs` builds `web/dist` |
 | `web/brand/` | Logo, icon, one-colour variants, touch icon and shared design tokens (`brand.css`) |
 | `design/` | Implementation audit, competitor review, design system, brand notes, redesign plan and report |
+| `agent/` | MCP server for AI agents: create, check (and verify) and deliver Doorstep payments, within operator limits. See [agent/README.md](agent/README.md) |
+| `test/VaultFork.t.sol` | Delivers into a real Morpho USDC vault on a fork of Arc mainnet, then redeems and cancels |
 
 ## What has been verified
 
@@ -134,8 +136,22 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | Hosted API: invoice paid in two parts (part_paid, then delivered/paid), cancel (cancelled), both webhooks signed and verified; 401 without a key, 400 on bad input | `api/` on a local Arc node with the bot | all pass |
 | Hosted API live on mainnet: health check from outside, an address created and registered with an API key | https://api.104-251-218-80.sslip.io | works |
 | Live site on mainnet: a visitor's savings address, paid from a wallet, delivered automatically by the bot | https://phoenix-2203.github.io/doorstep/ + `keeper/` | delivered, see [Mainnet proof](#mainnet-proof) |
+| AI-agent MCP server through a real MCP client: full invoice (part payment waits, then delivered and paid), a swapped beneficiary caught, a forged contract or chain refused, operator limits enforced | `agent/test/` on a local Arc node | 6 pass |
+| Live demo end to end in a headless browser: register, send a chosen amount, delivered with receipt and notice, under-minimum payment taken back, partial withdraw | `web/test/demo-flow.mjs` against an in-memory chain (no real money) | works |
 
 Arc's USDC system contracts used in the tests are generated from `circlefin/arc-node`'s genesis. The USDC proxy and implementation bytecode are identical in the localdev and mainnet genesis files.
+
+## How it compares
+
+| | Doorstep | Relay deposit addresses | Daimo Pay | Bridge liquidation addresses | Across (on Arc) |
+| --- | --- | --- | --- | --- | --- |
+| Pay from an exchange | Yes (any exchange with Arc USDC) | Yes | Yes (hosted page) | Yes | No, needs a wallet connection |
+| Calls a contract for the payer | **Yes, the core feature** | No (destination calldata not allowed) | Yes (Arc support unconfirmed) | No | Yes, wallet users only |
+| Who holds funds while waiting | Nobody: only the target contract or the refund wallet | Their depository contract | Their contracts and solvers | Bridge (custodial, KYC) | Relayers, briefly |
+| Refunds | Automatic on failure or deadline; payer can cancel any time | To `refundTo`, minus gas | Unconfirmed | Not documented | Bridge refunds |
+| Account needed | No | API | API | API and KYC | No |
+
+Doorstep's limits: Arc and USDC only, not audited, one public delivery bot today, no fiat or card payments, and wrong tokens sent to an address can't be recovered. Sources and details: [design/COMPETITOR_REVIEW.md](design/COMPETITOR_REVIEW.md).
 
 ## Run it
 
