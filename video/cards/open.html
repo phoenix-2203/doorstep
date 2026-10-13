@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.wrap { position: absolute; left: 180px; right: 180px; top: 0; bottom: 120px; display: flex; flex-direction: column; justify-content: center; }
+.l { font-weight: 750; font-size: 92px; line-height: 1.04; letter-spacing: -0.035em; margin: 0 0 22px; }
+.l.dim { color: #A9C2B5; }
+.wall { display: inline-block; width: 14px; height: 96px; background: #B9F27C; border-radius: 4px; vertical-align: -10px; margin-left: 26px; transform: scaleY(0); transform-origin: bottom; transition: transform .6s .25s cubic-bezier(.2,.7,.2,1); }
+.on .wall { transform: scaleY(1); }
+.mark { position: absolute; left: 180px; bottom: 110px; display: flex; gap: 18px; align-items: center; font-weight: 700; font-size: 34px; letter-spacing: -0.02em; opacity: .9; }
+.mark svg { width: 46px; height: 46px; }
+</style></head><body>
+<div class="wrap">
+  <p class="l in" id="a">Your users keep their USDC on exchanges.</p>
+  <p class="l in dim" id="b">Your Arc app keeps money in a smart contract.</p>
+  <p class="l in" id="c">Between the two, there's a wall.<span class="wall"></span></p>
+</div>
+<div class="mark in" id="m"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1E5241"/><path d="M17 49V27a15.5 15.5 0 0 1 31 0v22" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round"/><path d="M6.5 36H31M25 30l6 6-6 6" fill="none" stroke="#B9F27C" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="42.6" cy="45" r="3.6" fill="#B9F27C"/></svg>doorstep</div>
+<script>
+window.__play = (starts) => { [['a',0],['b',1],['c',2]].forEach(([id,i]) => setTimeout(() => document.getElementById(id).classList.add('on'), starts[i]*1000 - 150)); setTimeout(() => document.getElementById('m').classList.add('on'), 200); };
+</script></body></html>

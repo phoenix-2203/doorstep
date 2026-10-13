@@ -1,0 +1,45 @@
+[
+  { "scene": "open", "lines": [
+    "Your users keep their USDC on exchanges.",
+    "Your Arc app keeps money in a smart contract.",
+    "And between the two, there's a wall."
+  ]},
+  { "scene": "problem", "lines": [
+    "On Arc, wallets and exchanges can only send USDC to an address.",
+    "But vaults, escrows and checkouts only accept money through their own deposit function.",
+    "So a plain transfer fails, or lands without crediting anyone. This already happened on Arc mainnet."
+  ]},
+  { "scene": "solution", "lines": [
+    "Doorstep fixes this.",
+    "Every payer gets their own address.",
+    "Whatever arrives there is deposited into your contract, for the right person, within seconds.",
+    "And if it can't be delivered, it goes straight back."
+  ]},
+  { "scene": "demo", "lines": [
+    "Here it is, live on Arc mainnet, with real USDC.",
+    "I connect my wallet and get my savings address. I only do this once.",
+    "Then I send five cents to it, exactly the way any wallet or exchange would.",
+    "Seconds later, the delivery bot drops it into the savings vault, credited to me.",
+    "The network fee is less than a cent, taken from the payment. Doorstep keeps nothing.",
+    "And I can withdraw it all, any time."
+  ]},
+  { "scene": "trust", "lines": [
+    "The address is the instructions.",
+    "Change any detail, and you get a different address. So nobody can redirect a payment. Not even us.",
+    "There's no admin key, and the refund wallet can take its money back at any moment."
+  ]},
+  { "scene": "devs", "lines": [
+    "For builders, it's one function call with the SDK, now on npm.",
+    "Or one HTTPS request with the hosted API, with invoices and signed webhooks.",
+    "And AI agents can use it too. Our MCP server lets an agent create payment links, check a link before paying it, and deliver, without ever being able to send money anywhere else."
+  ]},
+  { "scene": "arc", "lines": [
+    "It's built on what makes Arc different. Gas paid in USDC. One balance for every kind of transfer. And addresses that can be paid again and again.",
+    "Everything you've seen is open source, tested, and running on mainnet today."
+  ]},
+  { "scene": "end", "lines": [
+    "Doorstep.",
+    "Payments that find their way in.",
+    "Any wallet. Any exchange. Straight into your Arc app."
+  ]}
+]

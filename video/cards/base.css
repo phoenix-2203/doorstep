@@ -1,0 +1,5 @@
+@font-face { font-family: "S"; src: url("/doorstep/brand/fonts/schibsted-grotesk-latin-wght-normal.woff2") format("woff2-variations"); font-weight: 400 900; }
+@font-face { font-family: "M"; src: url("/doorstep/brand/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #153E31; color: #F6F7F2; font-family: "S", sans-serif; -webkit-font-smoothing: antialiased; }
+.in { opacity: 0; transform: translateY(18px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+.in.on { opacity: 1; transform: none; }

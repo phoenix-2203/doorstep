@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="base.css"><style>
+.center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.logo { display: flex; align-items: center; gap: 34px; }
+.logo svg { width: 190px; height: 190px; }
+.word { font-weight: 750; font-size: 150px; letter-spacing: -0.04em; }
+#arch { stroke-dasharray: 120; stroke-dashoffset: 120; transition: stroke-dashoffset 1s cubic-bezier(.3,.7,.2,1); }
+#arrow { transform: translateX(-40px); opacity: 0; transition: transform .7s .6s cubic-bezier(.2,.7,.2,1), opacity .4s .6s; }
+#dot { transform: scale(0); transform-origin: 42.6px 45px; transition: transform .45s 1.2s cubic-bezier(.3,1.6,.5,1); }
+.go #arch { stroke-dashoffset: 0; } .go #arrow { transform: none; opacity: 1; } .go #dot { transform: scale(1); }
+.tag { margin-top: 36px; font-size: 54px; font-weight: 600; letter-spacing: -0.02em; color: #B9F27C; }
+.pills { margin-top: 44px; display: flex; gap: 16px; }
+.pills span { border: 2px solid rgba(246,247,242,.35); border-radius: 999px; padding: 12px 26px; font-size: 32px; font-weight: 600; }
+.links { position: absolute; left: 0; right: 0; bottom: 96px; display: flex; justify-content: center; gap: 56px; font-family: "M", monospace; font-size: 30px; color: #DDE8E0; }
+.foot { position: absolute; left: 0; right: 0; bottom: 48px; text-align: center; font-size: 24px; color: #A9C2B5; }
+</style></head><body>
+<div class="center">
+  <div class="logo in" id="lg"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1E5241"/><path id="arch" d="M17 49V27a15.5 15.5 0 0 1 31 0v22" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round"/><path id="arrow" d="M6.5 36H31M25 30l6 6-6 6" fill="none" stroke="#B9F27C" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><circle id="dot" cx="42.6" cy="45" r="3.6" fill="#B9F27C"/></svg><span class="word">doorstep</span></div>
+  <div class="tag in" id="tg">Payments that find their way in.</div>
+  <div class="pills in" id="pl"><span>Any wallet</span><span>Any exchange</span><span>Straight into your Arc app</span></div>
+</div>
+<div class="links in" id="ln"><span>arcdoorstep.duckdns.org</span><span>github.com/phoenix-2203/doorstep</span><span>npm i doorstep-arc</span></div>
+<div class="foot in" id="ft">Live on Arc mainnet. Open source. Not audited yet.</div>
+<script>
+window.__play = (s) => {
+  const on = (id, t) => setTimeout(() => document.getElementById(id).classList.add('on'), t * 1000);
+  on('lg', s[0] - 0.4); setTimeout(() => document.body.classList.add('go'), (s[0] - 0.3) * 1000);
+  on('tg', s[1] - 0.1); on('pl', s[2] - 0.1); on('ln', s[2] + 1.6); on('ft', s[2] + 2.2);
+};
+</script></body></html>
