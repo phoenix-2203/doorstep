@@ -1,0 +1,303 @@
+[
+ {
+  "scene": "hook",
+  "si": 0,
+  "li": 0,
+  "text": "Here's something that should be simple.",
+  "file": "lines/00_00.wav",
+  "dur": 1.981,
+  "heard": "Here's something that should be simple.",
+  "missing": []
+ },
+ {
+  "scene": "hook",
+  "si": 0,
+  "li": 1,
+  "text": "You've got USDC on an exchange. You want it in a savings app on Arc.",
+  "file": "lines/00_01.wav",
+  "dur": 5.013,
+  "heard": "You've got USDC on an exchange. You want it in a savings app on Ark.",
+  "missing": [
+   "arc"
+  ]
+ },
+ {
+  "scene": "hook",
+  "si": 0,
+  "li": 2,
+  "text": "So you send it\u2026 and the app has no idea it's yours.",
+  "file": "lines/00_02.wav",
+  "dur": 3.547,
+  "heard": "So you send it, and the app has no idea it's yours.",
+  "missing": []
+ },
+ {
+  "scene": "friction",
+  "si": 1,
+  "li": 0,
+  "text": "Exchanges and wallets can only send to an address.",
+  "file": "lines/01_00.wav",
+  "dur": 3.406,
+  "heard": "Exchanges and wallets can only send to an address.",
+  "missing": []
+ },
+ {
+  "scene": "friction",
+  "si": 1,
+  "li": 1,
+  "text": "But apps keep money in smart contracts, and those only accept it through their own deposit function. That's how they know who to credit.",
+  "file": "lines/01_01.wav",
+  "dur": 8.707,
+  "heard": "but apps keep money in smart contracts, and those only accept it through their own deposit function. That's how they know who to credit.",
+  "missing": []
+ },
+ {
+  "scene": "friction",
+  "si": 1,
+  "li": 2,
+  "text": "Sending is easy. Getting it into the right contract is the hard part.",
+  "file": "lines/01_02.wav",
+  "dur": 4.639,
+  "heard": "Sending is easy. Getting it into the right contract, that's the hard part.",
+  "missing": []
+ },
+ {
+  "scene": "intro",
+  "si": 2,
+  "li": 0,
+  "text": "Doorstep closes that gap.",
+  "file": "lines/02_00.wav",
+  "dur": 1.728,
+  "heard": "Doorstep closes that gap.",
+  "missing": []
+ },
+ {
+  "scene": "intro",
+  "si": 2,
+  "li": 1,
+  "text": "It turns an ordinary USDC transfer into a proper deposit, credited to the right person.",
+  "file": "lines/02_01.wav",
+  "dur": 6.879,
+  "heard": "It turns an ordinary USDC transfer into a proper deposit, credited to the right person.",
+  "missing": []
+ },
+ {
+  "scene": "mechanism",
+  "si": 3,
+  "li": 0,
+  "text": "Here's how.",
+  "file": "lines/03_00.wav",
+  "dur": 0.929,
+  "heard": "Here's how.",
+  "missing": []
+ },
+ {
+  "scene": "mechanism",
+  "si": 3,
+  "li": 1,
+  "text": "First, the app sets the instructions: the contract, who gets credited, and where refunds go.",
+  "file": "lines/03_01.wav",
+  "dur": 6.021,
+  "heard": "First, the app sets the instructions. The contract, who gets credited, and where refunds go.",
+  "missing": []
+ },
+ {
+  "scene": "mechanism",
+  "si": 3,
+  "li": 2,
+  "text": "Those instructions produce an address. Change anything, and you get a different one.",
+  "file": "lines/03_02.wav",
+  "dur": 5.072,
+  "heard": "Those instructions produce an address. Change anything and you get a different one.",
+  "missing": []
+ },
+ {
+  "scene": "mechanism",
+  "si": 3,
+  "li": 3,
+  "text": "The payer just sends their USDC there, from a wallet or straight from an exchange.",
+  "file": "lines/03_03.wav",
+  "dur": 5.521,
+  "heard": "The payer just sends their USDC there, from a wallet or straight from an exchange.",
+  "missing": []
+ },
+ {
+  "scene": "mechanism",
+  "si": 3,
+  "li": 4,
+  "text": "Then a delivery bot calls the contract's deposit function for them. If it can't, the money goes back to the refund wallet.",
+  "file": "lines/03_04.wav",
+  "dur": 8.164,
+  "heard": "Then a delivery bot calls the contract's deposit function for them. If it can't, the money goes back to the refund wallet.",
+  "missing": []
+ },
+ {
+  "scene": "product",
+  "si": 4,
+  "li": 0,
+  "text": "And it's live on Arc mainnet.",
+  "file": "lines/04_00.wav",
+  "dur": 1.952,
+  "heard": "and it's live on Arc Mainnet.",
+  "missing": []
+ },
+ {
+  "scene": "product",
+  "si": 4,
+  "li": 1,
+  "text": "In the demo, you get your own savings address, with a QR code and the instructions behind it.",
+  "file": "lines/04_01.wav",
+  "dur": 6.076,
+  "heard": "In the demo, you get your own savings address, with a QR code and the instructions behind it.",
+  "missing": []
+ },
+ {
+  "scene": "product",
+  "si": 4,
+  "li": 2,
+  "text": "Send a few cents, and watch it arrive in your savings.",
+  "file": "lines/04_02.wav",
+  "dur": 3.35,
+  "heard": "Send a few cents and watch it arrive in your savings.",
+  "missing": []
+ },
+ {
+  "scene": "product",
+  "si": 4,
+  "li": 3,
+  "text": "Every payment gets a receipt, and Doorstep's cut is zero.",
+  "file": "lines/04_03.wav",
+  "dur": 3.826,
+  "heard": "Every payment gets a receipt and door steps cut is zero.",
+  "missing": [
+   "doorsteps"
+  ]
+ },
+ {
+  "scene": "product",
+  "si": 4,
+  "li": 4,
+  "text": "Behind it: an SDK on npm, a hosted API with signed webhooks, and a bot that runs around the clock.",
+  "file": "lines/04_04.wav",
+  "dur": 8.942,
+  "heard": "Behind it, there's an SDK on NPM, a hosted API with signed webhooks, and a bot that runs around the clock.",
+  "missing": []
+ },
+ {
+  "scene": "arc",
+  "si": 5,
+  "li": 0,
+  "text": "Arc is what makes this practical, because gas is paid in USDC.",
+  "file": "lines/05_00.wav",
+  "dur": 4.618,
+  "heard": "Arc is what makes this practical because gas is paid in USDC.",
+  "missing": []
+ },
+ {
+  "scene": "arc",
+  "si": 5,
+  "li": 1,
+  "text": "The bot spends USDC to deliver, and it's repaid in USDC from the payment, with a cap.",
+  "file": "lines/05_01.wav",
+  "dur": 6.527,
+  "heard": "The bot spends USDC to deliver and it's repaid in USDC from the payment with a cap.",
+  "missing": []
+ },
+ {
+  "scene": "arc",
+  "si": 5,
+  "li": 2,
+  "text": "No second token. No price oracle. No swaps.",
+  "file": "lines/05_02.wav",
+  "dur": 3.582,
+  "heard": "No second token, no prize oracle, no swaps.",
+  "missing": [
+   "price"
+  ]
+ },
+ {
+  "scene": "security",
+  "si": 6,
+  "li": 0,
+  "text": "Apart from that capped fee, money only goes two places: into the contract in the instructions, or back to the refund wallet.",
+  "file": "lines/06_00.wav",
+  "dur": 8.639,
+  "heard": "Apart from that capped fee, money only goes two places. Into the contract in the instructions or back to the refund wallet.",
+  "missing": []
+ },
+ {
+  "scene": "security",
+  "si": 6,
+  "li": 1,
+  "text": "Nobody can redirect a payment, and there's no admin key at all.",
+  "file": "lines/06_01.wav",
+  "dur": 4.246,
+  "heard": "Nobody can redirect a payment, and there's no admin key at all.",
+  "missing": []
+ },
+ {
+  "scene": "security",
+  "si": 6,
+  "li": 2,
+  "text": "It isn't audited yet, so keep the amounts small.",
+  "file": "lines/06_02.wav",
+  "dur": 2.998,
+  "heard": "It isn't audited yet, so keep the amount small.",
+  "missing": [
+   "amounts"
+  ]
+ },
+ {
+  "scene": "uses",
+  "si": 7,
+  "li": 0,
+  "text": "And because it's just an address, any app can use it.",
+  "file": "lines/07_00.wav",
+  "dur": 3.208,
+  "heard": "And because it's just an address, any app can use it.",
+  "missing": []
+ },
+ {
+  "scene": "uses",
+  "si": 7,
+  "li": 1,
+  "text": "Savings. Escrow. Invoices. Payroll.",
+  "file": "lines/07_01.wav",
+  "dur": 2.81,
+  "heard": "Savings escrow invoices payroll.",
+  "missing": []
+ },
+ {
+  "scene": "uses",
+  "si": 7,
+  "li": 2,
+  "text": "Even AI agents: our MCP server lets them create, check and deliver payments, but never send money anywhere else.",
+  "file": "lines/07_02.wav",
+  "dur": 8.64,
+  "heard": "even AI agents. Our MCP server lets them create, check, and deliver payments, but never send money anywhere else.",
+  "missing": []
+ },
+ {
+  "scene": "close",
+  "si": 8,
+  "li": 0,
+  "text": "Your users' money is already out there.",
+  "file": "lines/08_00.wav",
+  "dur": 2.438,
+  "heard": "Your user's money is already out there.",
+  "missing": []
+ },
+ {
+  "scene": "close",
+  "si": 8,
+  "li": 1,
+  "text": "Doorstep gives it a way in.",
+  "file": "lines/08_01.wav",
+  "dur": 1.673,
+  "heard": "Door step gives it a weigh in.",
+  "missing": [
+   "doorstep",
+   "way"
+  ]
+ }
+]
