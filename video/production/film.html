@@ -1,0 +1,437 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Doorstep film</title>
+<style>
+@font-face { font-family: "S"; src: url("/web/dist/brand/fonts/schibsted-grotesk-latin-wght-normal.woff2") format("woff2-variations"); font-weight: 400 900; }
+@font-face { font-family: "M"; src: url("/web/dist/brand/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+:root { --forest:#153E31; --forest2:#1E5241; --forest3:#0F3027; --lime:#B9F27C; --bg:#F6F7F2; --ink:#171C19; --muted:#5B6960; --line:#DCE3DA; --fm:#A9C2B5; --amber:#C98A1B; --rust:#B4553E; }
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; font-family: "S", sans-serif; -webkit-font-smoothing: antialiased; color: var(--ink); }
+#stage { position: absolute; inset: 0; overflow: hidden; }
+.scene { position: absolute; inset: 0; opacity: 0; overflow: hidden; }
+.dark { background: radial-gradient(1400px 900px at 50% 45%, #1A4A3B 0%, var(--forest) 55%, #0E2C23 100%); color: #F6F7F2; }
+.light { background: var(--bg); }
+.abs { position: absolute; }
+.mono { font-family: "M", monospace; font-variant-ligatures: none; }
+.cap { font-weight: 760; letter-spacing: -0.005em; text-transform: uppercase; }
+.h1 { font-size: 78px; line-height: 1.02; }
+.h2 { font-size: 54px; line-height: 1.06; font-weight: 720; letter-spacing: -0.02em; }
+.lime { color: var(--lime); }
+.forest { color: var(--forest); }
+.muted { color: var(--muted); }
+.card { background: #fff; border: 1.5px solid var(--line); border-radius: 22px; box-shadow: 0 30px 60px -40px rgba(15,48,39,.35); }
+.dcard { background: rgba(246,247,242,.06); border: 1.5px solid rgba(246,247,242,.16); border-radius: 22px; }
+.pill { display: inline-flex; align-items: center; gap: 12px; border-radius: 999px; padding: 14px 26px; font-weight: 640; font-size: 28px; white-space: nowrap; }
+.token { background: var(--lime); color: #10241C; font-weight: 760; font-size: 28px; border-radius: 999px; padding: 12px 22px; box-shadow: 0 0 0 10px rgba(185,242,124,.16), 0 0 40px rgba(185,242,124,.35); white-space: nowrap; }
+.label { font-size: 22px; color: var(--fm); font-weight: 560; }
+.tag { position: absolute; left: 60px; bottom: 44px; font-size: 21px; font-weight: 560; padding: 8px 16px; border-radius: 999px; }
+.tag.l { color: var(--muted); background: rgba(21,62,49,.06); }
+.tag.d { color: var(--fm); background: rgba(246,247,242,.07); }
+svg { overflow: visible; }
+.row { display: grid; grid-template-columns: 250px 1fr; gap: 20px; padding: 14px 0; border-top: 1.5px dashed var(--line); font-size: 26px; }
+.row:first-child { border-top: 0; }
+.row .k { color: var(--muted); font-family: "M", monospace; font-size: 24px; }
+.row .v { font-family: "M", monospace; font-size: 25px; }
+.browser { position: absolute; border-radius: 18px; overflow: hidden; background: #fff; box-shadow: 0 50px 100px -40px rgba(15,48,39,.45), 0 0 0 1.5px var(--line); }
+.browser .bar { height: 52px; background: #EEF1EC; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1.5px solid var(--line); }
+.browser .bar i { width: 13px; height: 13px; border-radius: 50%; background: #D5DBD3; display: inline-block; }
+.browser .bar span { margin-left: 18px; background: #fff; border-radius: 8px; padding: 6px 16px; font-size: 19px; color: var(--muted); font-family: "M", monospace; }
+.browser .vp { position: absolute; left: 0; right: 0; top: 52px; bottom: 0; overflow: hidden; }
+.browser .vp img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+.step { display: flex; align-items: center; gap: 22px; font-size: 34px; font-weight: 640; color: #A7B0A9; margin-bottom: 34px; }
+.step b { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; box-shadow: inset 0 0 0 2.5px #C6CEC5; color: #A7B0A9; }
+.step.on { color: var(--ink); } .step.on b { background: var(--forest); color: #fff; box-shadow: none; }
+.step.done { color: var(--muted); } .step.done b { background: #DCE8D8; color: var(--forest); box-shadow: none; }
+.strike { position: relative; }
+.strike::after { content: ""; position: absolute; left: 14px; right: 14px; top: 50%; height: 4px; background: var(--lime); transform-origin: left; transform: scaleX(var(--s, 0)); border-radius: 2px; }
+.tile { position: absolute; width: 300px; height: 230px; padding: 30px; border-radius: 24px; background: rgba(246,247,242,.06); border: 1.5px solid rgba(246,247,242,.16); }
+.tile h3 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.01em; }
+.tile p { margin: 12px 0 0; font-size: 22px; color: var(--fm); line-height: 1.35; }
+.tile svg { width: 54px; height: 54px; margin-bottom: 18px; color: var(--lime); }
+</style></head>
+<body>
+<div id="stage"></div>
+<script>
+// ------------------------------------------------------------------ engine
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const io = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const eo = (x) => 1 - Math.pow(1 - x, 3);
+const P = (t, t0, d) => clamp((t - t0) / d);
+const lerp = (a, b, v) => a + (b - a) * v;
+const $ = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
+const show = (el, v, dy = 24, dx = 0) => { el.style.opacity = v; el.style.transform = `translate(${(1 - v) * dx}px, ${(1 - v) * dy}px)`; };
+const pos = (el, x, y) => { el.style.left = x + 'px'; el.style.top = y + 'px'; };
+const LOGO = (size, arch = '#fff') => `<svg width="${size}" height="${size}" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1E5241"/><path class="arch" d="M17 49V27a15.5 15.5 0 0 1 31 0v22" fill="none" stroke="${arch}" stroke-width="4.6" stroke-linecap="round" pathLength="100"/><path class="arrow" d="M6.5 36H31M25 30l6 6-6 6" fill="none" stroke="#B9F27C" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><circle class="dot" cx="42.6" cy="45" r="3.6" fill="#B9F27C"/></svg>`;
+const MARK = (size, col = '#B9F27C') => `<svg width="${size}" height="${size}" viewBox="0 0 64 64"><path d="M17 49V27a15.5 15.5 0 0 1 31 0v22" fill="none" stroke="#F6F7F2" stroke-width="4.6" stroke-linecap="round"/><path d="M6.5 36H31M25 30l6 6-6 6" fill="none" stroke="${col}" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="42.6" cy="45" r="3.6" fill="${col}"/></svg>`;
+const ICON = {
+  exchange: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18M12 3l9 5H3z"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 14.5h2"/></svg>',
+  vault: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5V7M15.5 12H17"/></svg>',
+  escrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 7.6-8 9-4.6-1.4-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
+  invoice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+  payroll: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><path d="M17 7v6M14 10h6"/></svg>',
+  agent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/></svg>',
+  refund: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
+  bot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>',
+};
+
+const TL = window.TL;
+const stage = document.getElementById('stage');
+const scenes = {};
+function scene(id, cls, build, draw) {
+  const s = TL.scenes.find((x) => x.id === id);
+  const el = $(`<div class="scene ${cls}" id="s-${id}"></div>`);
+  stage.appendChild(el);
+  const ctx = build(el, s);
+  scenes[id] = { s, el, draw: (lt) => draw(lt, ctx, s.lines.map((l) => l.local), s) };
+}
+// A small travelling payment token along a polyline
+function along(pts, v) {
+  let total = 0; const seg = [];
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); total += d; }
+  let r = v * total;
+  for (let i = 0; i < seg.length; i++) { if (r <= seg[i]) { const f = seg[i] ? r / seg[i] : 0; return [lerp(pts[i][0], pts[i + 1][0], f), lerp(pts[i][1], pts[i + 1][1], f)]; } r -= seg[i]; }
+  return pts[pts.length - 1];
+}
+const placeTok = (el, xy, w = 150, h = 56) => { el.style.left = (xy[0] - w / 2) + 'px'; el.style.top = (xy[1] - h / 2) + 'px'; };
+
+// ================================================================== 1. HOOK
+scene('hook', 'dark', (el) => {
+  const h1 = $(`<div class="abs cap h1" style="left:160px;top:150px;width:1600px">Your money can reach an address.</div>`);
+  const h2 = $(`<div class="abs cap h1 lime" style="left:160px;top:248px;width:1760px">But can the app actually receive it?</div>`);
+  const ex = $(`<div class="abs dcard" style="left:200px;top:560px;width:420px;height:250px;padding:34px">
+     <div style="display:flex;align-items:center;gap:16px;color:var(--fm)"><span style="width:44px;height:44px;color:var(--lime)">${ICON.exchange}</span><span style="font-size:26px;font-weight:600">Exchange account</span></div>
+     <div style="font-size:64px;font-weight:760;margin-top:22px;letter-spacing:-0.02em"><span id="exb">250.00</span> <span style="font-size:30px;color:var(--fm)">USDC</span></div>
+     <div class="label" style="margin-top:10px">Withdraw · network: Arc</div></div>`);
+  const va = $(`<div class="abs dcard" style="left:1240px;top:540px;width:480px;height:290px;padding:34px">
+     <div style="display:flex;align-items:center;gap:16px;color:var(--fm)"><span style="width:44px;height:44px;color:var(--lime)">${ICON.vault}</span><span style="font-size:26px;font-weight:600">Savings app · smart contract</span></div>
+     <div class="mono" style="font-size:22px;margin-top:26px;color:var(--fm)">accepts: deposit(amount, you)</div>
+     <div style="margin-top:22px;font-size:26px;color:var(--fm)">Your balance</div>
+     <div style="font-size:52px;font-weight:760;letter-spacing:-0.02em">0.00 <span style="font-size:26px;color:var(--fm)">USDC</span></div></div>`);
+  const track = $(`<svg class="abs" style="left:0;top:0" width="1920" height="1080"><path d="M620 685 H1240" stroke="rgba(246,247,242,.25)" stroke-width="3" stroke-dasharray="10 12"/></svg>`);
+  const tok = $(`<div class="abs token">25 USDC</div>`);
+  const chip = $(`<div class="abs pill" style="left:660px;top:770px;background:rgba(201,138,27,.16);color:#F3D58A;font-size:24px">Arrived as a plain transfer · nobody credited</div>`);
+  const tag = $(`<div class="tag d">Illustration</div>`);
+  [track, ex, va, tok, h1, h2, chip, tag].forEach((e) => el.appendChild(e));
+  return { h1, h2, ex, va, tok, chip, exb: ex.querySelector('#exb') };
+}, (t, c, L) => {
+  show(c.ex, eo(P(t, 0.1, .8)), 20); show(c.va, eo(P(t, 0.3, .8)), 20);
+  show(c.h1, eo(P(t, L[1] - 0.2, .8))); show(c.h2, eo(P(t, L[2] + 1.8, .8)));
+  const v = io(P(t, L[1] + 1.6, 3.2));
+  c.tok.style.opacity = P(t, L[1] + 1.3, .3);
+  c.exb.textContent = t > L[1] + 1.4 ? '225.00' : '250.00';
+  placeTok(c.tok, [lerp(560, 1150, v), 685]);
+  const bump = P(t, L[2] + 0.4, .5);
+  c.va.style.borderColor = bump > 0 ? `rgba(201,138,27,${0.25 + 0.5 * Math.sin(Math.PI * Math.min(1, bump)) })` : '';
+  show(c.chip, eo(P(t, L[2] + 0.9, .6)), 14);
+});
+
+// ================================================================== 2. FRICTION
+scene('friction', 'light', (el) => {
+  const h1 = $(`<div class="abs cap h1 forest" style="left:160px;top:150px">Sending USDC is easy.</div>`);
+  const h2 = $(`<div class="abs cap h1" style="left:160px;top:640px;width:1700px">Getting it into the right contract is the hard part.</div>`);
+  const steps = ['Withdraw from exchange', 'Personal wallet', 'Add the Arc network', 'Open the app', 'Connect wallet', 'Approve', 'Deposit'];
+  const wrap = $(`<div class="abs" style="left:160px;top:330px;width:1640px;display:flex;flex-wrap:wrap;gap:22px 16px;align-items:center"></div>`);
+  const pills = steps.map((s, i) => {
+    const p = $(`<div class="pill" style="background:#fff;border:1.5px solid var(--line);font-size:27px"><span class="mono" style="color:var(--muted);font-size:21px">${i + 1}</span>${s}</div>`);
+    wrap.appendChild(p);
+    if (i < steps.length - 1) { const a = $(`<span style="color:#B7C0B8;font-size:30px">→</span>`); wrap.appendChild(a); p._a = a; }
+    return p;
+  });
+  [h1, wrap, h2].forEach((e) => el.appendChild(e));
+  return { h1, h2, pills, wrap };
+}, (t, c, L) => {
+  show(c.h1, eo(P(t, 0.1, .8)));
+  const t0 = L[1] + 0.3, span = (L[2] - 0.6) - t0;
+  c.pills.forEach((p, i) => { const v = eo(P(t, t0 + span * i / c.pills.length, .45)); show(p, v, 16); if (p._a) p._a.style.opacity = eo(P(t, t0 + span * (i + 0.6) / c.pills.length, .3)); });
+  const dim = P(t, L[2], .8); c.wrap.style.opacity = 1 - 0.55 * dim; c.wrap.style.filter = `blur(${dim * 1.5}px)`;
+  show(c.h2, eo(P(t, L[2] + 0.2, .9)));
+});
+
+// ================================================================== 3. INTRO
+scene('intro', 'dark', (el) => {
+  const logo = $(`<div class="abs" style="left:0;top:0;width:1920px;display:flex;flex-direction:column;align-items:center"></div>`);
+  const row = $(`<div style="display:flex;align-items:center;gap:36px">${LOGO(170)}<span style="font-size:150px;font-weight:760;letter-spacing:-0.045em">doorstep</span></div>`);
+  const tg = $(`<div style="margin-top:22px;font-size:46px;font-weight:600;color:var(--lime);letter-spacing:-0.01em">Payments that find their way in.</div>`);
+  logo.appendChild(row); logo.appendChild(tg);
+  const path = $(`<svg class="abs" style="left:0;top:0" width="1920" height="1080"><path id="ip" d="M560 760 H1360" stroke="#B9F27C" stroke-width="4" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" stroke-linecap="round"/></svg>`);
+  const n1 = $(`<div class="abs dcard" style="left:200px;top:690px;width:360px;height:140px;padding:26px;display:flex;gap:18px;align-items:center"><span style="width:52px;height:52px;color:var(--lime)">${ICON.wallet}</span><div><div style="font-size:30px;font-weight:700">Wallet or exchange</div><div class="label">sends USDC to an address</div></div></div>`);
+  const n2 = $(`<div class="abs" style="left:885px;top:685px;width:150px;height:150px;border-radius:34px;background:#1E5241;display:grid;place-items:center;box-shadow:0 0 0 2px rgba(185,242,124,.4)">${MARK(104)}</div>`);
+  const n3 = $(`<div class="abs dcard" style="left:1360px;top:690px;width:380px;height:140px;padding:26px;display:flex;gap:18px;align-items:center"><span style="width:52px;height:52px;color:var(--lime)">${ICON.vault}</span><div><div style="font-size:30px;font-weight:700">Smart contract</div><div class="label mono" style="font-size:20px">deposit(amount, payer)</div></div></div>`);
+  const cr = $(`<div class="abs pill" style="left:1385px;top:860px;background:rgba(185,242,124,.14);color:var(--lime);font-size:24px">Credited to the right person</div>`);
+  const tok = $(`<div class="abs token" style="font-size:22px;padding:9px 16px">USDC</div>`);
+  [path, n1, n2, n3, tok, cr, logo].forEach((e) => el.appendChild(e));
+  return { logo, row, tg, path: path.querySelector('#ip'), n1, n2, n3, cr, tok, arch: row.querySelector('.arch'), arrow: row.querySelector('.arrow'), dot: row.querySelector('.dot') };
+}, (t, c, L) => {
+  const a = eo(P(t, L[0] - 0.3, 1.1));
+  c.arch.style.strokeDasharray = 100; c.arch.style.strokeDashoffset = 100 * (1 - a);
+  c.arrow.style.transform = `translateX(${-18 * (1 - eo(P(t, L[0] + .3, .7)))}px)`; c.arrow.style.opacity = P(t, L[0] + .3, .4);
+  const d = eo(P(t, L[0] + .8, .5)); c.dot.style.transform = `scale(${d})`; c.dot.style.transformOrigin = '42.6px 45px';
+  show(c.row, eo(P(t, L[0] - 0.4, .6)), 0);
+  show(c.tg, eo(P(t, L[0] + 1.1, .7)), 14);
+  // move the logo up when the path appears
+  const up = io(P(t, L[1] - 0.2, 1.0));
+  c.logo.style.top = lerp(380, 170, up) + 'px';
+  c.row.style.transform = `scale(${lerp(1, 0.72, up)})`;
+  [c.n1, c.n2, c.n3].forEach((n, i) => show(n, eo(P(t, L[1] + 0.2 + i * 0.25, .6)), 20));
+  const pv = io(P(t, L[1] + 1.4, 2.8));
+  c.path.style.strokeDashoffset = 100 * (1 - pv);
+  c.tok.style.opacity = pv > 0 && pv < 1 ? 1 : 0; placeTok(c.tok, [lerp(560, 1360, pv), 760], 92, 46);
+  show(c.cr, eo(P(t, L[1] + 4.3, .6)), 12);
+});
+
+// ================================================================== 4. MECHANISM
+const ADDR_A = '0xf962e1bd55Ad7FD2e3E804831e4cc2bDBEa75d54', ADDR_B = '0x50b97b12e90Bc93Cd363De1896A1c31694cE95e9';
+scene('mechanism', 'light', (el) => {
+  const title = $(`<div class="abs" style="left:120px;top:110px;font-size:30px;font-weight:650;color:var(--muted)">How it works</div>`);
+  const names = ['Instructions', 'Address', 'Send', 'Deliver or return'];
+  const rail = $(`<div class="abs" style="left:120px;top:200px;width:460px"></div>`);
+  const steps = names.map((n, i) => { const s = $(`<div class="step"><b>${i + 1}</b>${n}</div>`); rail.appendChild(s); return s; });
+  const card = $(`<div class="abs card" style="left:640px;top:170px;width:1140px;padding:26px 40px">
+    <div style="font-size:24px;font-weight:650;color:var(--muted);margin-bottom:6px">Instructions</div>
+    <div class="row"><span class="k">contract</span><span class="v">0x3da5…7bB3 <span style="font-family:S;color:var(--muted);font-size:22px">demo savings vault</span></span></div>
+    <div class="row"><span class="k">call</span><span class="v">deposit(amount, beneficiary)</span></div>
+    <div class="row" id="ben"><span class="k">beneficiary</span><span class="v" id="benv">0xada0…0001</span></div>
+    <div class="row"><span class="k">refund to</span><span class="v">0xada0…0001</span></div>
+    <div class="row"><span class="k">minimum</span><span class="v">25 USDC</span></div>
+    <div class="row"><span class="k">fee limit</span><span class="v">0.01 USDC</span></div>
+    <div class="row"><span class="k">deadline</span><span class="v">2027-01-01</span></div>
+    <div class="row"><span class="k">reference</span><span class="v">inv-1042</span></div></div>`);
+  const rows = [...card.querySelectorAll('.row')];
+  const addr = $(`<div class="abs" style="left:640px;top:760px;width:1140px;height:170px;border-radius:22px;background:var(--forest);color:#F6F7F2;padding:28px 40px">
+    <div style="display:flex;justify-content:space-between"><span style="font-size:24px;color:var(--fm);font-weight:600">Payment address</span><span class="mono" style="font-size:20px;color:var(--fm)">CREATE2(Doorstep, hash(instructions))</span></div>
+    <div class="mono" id="av" style="font-size:40px;margin-top:20px;letter-spacing:-0.01em">${ADDR_A}</div></div>`);
+  const nodeploy = $(`<div class="abs pill" style="left:1450px;top:690px;background:#E7F0E2;color:var(--forest);font-size:22px;padding:10px 20px">Nothing deployed yet</div>`);
+  const ex = $(`<div class="abs card" style="left:640px;top:250px;width:470px;padding:32px">
+    <div style="display:flex;align-items:center;gap:14px;color:var(--muted)"><span style="width:40px;height:40px;color:var(--forest)">${ICON.exchange}</span><span style="font-size:24px;font-weight:600">Exchange · withdraw</span></div>
+    <div style="font-size:56px;font-weight:760;margin-top:16px;letter-spacing:-0.02em">25.00 USDC</div>
+    <div class="mono muted" style="font-size:21px;margin-top:10px">to 0x50b9…95e9 · network Arc</div></div>`);
+  const noconn = $(`<div class="abs pill" style="left:640px;top:520px;background:#E7F0E2;color:var(--forest);font-size:23px;padding:10px 20px">No wallet connection · no approvals</div>`);
+  const vault = $(`<div class="abs card" style="left:1360px;top:200px;width:470px;padding:30px">
+    <div style="display:flex;align-items:center;gap:14px;color:var(--muted)"><span style="width:40px;height:40px;color:var(--forest)">${ICON.vault}</span><span style="font-size:24px;font-weight:600">Savings vault</span></div>
+    <div class="mono" style="font-size:21px;margin-top:16px">deposit(amount, 0xb0b0…0002)</div>
+    <div style="margin-top:14px;font-size:24px;color:var(--forest);font-weight:650" id="cred">Credited ✓</div></div>`);
+  const bot = $(`<div class="abs pill" style="left:1180px;top:420px;background:#fff;border:1.5px solid var(--line);font-size:22px;padding:10px 18px"><span style="width:28px;height:28px;color:var(--forest)">${ICON.bot}</span>Delivery bot calls deposit()</div>`);
+  const refund = $(`<div class="abs card" style="left:1360px;top:540px;width:420px;padding:26px 30px">
+    <div style="display:flex;align-items:center;gap:14px;color:var(--muted)"><span style="width:38px;height:38px;color:var(--rust)">${ICON.refund}</span><span style="font-size:24px;font-weight:600">Refund wallet</span></div>
+    <div style="font-size:21px;color:var(--muted);margin-top:10px">if it can't be delivered, or the deadline passes</div></div>`);
+  const svg = $(`<svg class="abs" style="left:0;top:0" width="1920" height="1080">
+     <path id="p3" d="M1110 380 C1180 380 1180 760 1210 760" stroke="#9FB5A6" stroke-width="3" fill="none" stroke-dasharray="9 10"/>
+     <path id="p4a" d="M1210 790 C1290 790 1290 300 1360 300" stroke="#153E31" stroke-width="4" fill="none" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+     <path id="p4b" d="M1210 850 C1290 850 1290 640 1360 640" stroke="#B4553E" stroke-width="3" fill="none" stroke-dasharray="9 10"/></svg>`);
+  const tok = $(`<div class="abs token" style="font-size:22px;padding:9px 16px">25 USDC</div>`);
+  [title, rail, svg, card, addr, nodeploy, ex, noconn, vault, bot, refund, tok].forEach((e) => el.appendChild(e));
+  return { steps, card, rows, addr, av: addr.querySelector('#av'), benv: card.querySelector('#benv'), ben: card.querySelector('#ben'), nodeploy, ex, noconn, vault, bot, refund, svg, p3: svg.querySelector('#p3'), p4a: svg.querySelector('#p4a'), p4b: svg.querySelector('#p4b'), tok };
+}, (t, c, L) => {
+  const S = [L[1] - 0.3, L[2] - 0.2, L[3] - 0.2, L[4] - 0.2];
+  const cur = t < S[1] ? 0 : t < S[2] ? 1 : t < S[3] ? 2 : 3;
+  c.steps.forEach((s, i) => { s.className = 'step' + (i === cur ? ' on' : i < cur ? ' done' : ''); s.style.opacity = eo(P(t, 0.1 + i * 0.12, .5)); });
+  // step 1: the card, rows appear
+  const cardIn = eo(P(t, S[0], .6));
+  c.rows.forEach((r, i) => { r.style.opacity = eo(P(t, S[0] + 0.25 + i * 0.32, .4)); });
+  // step 2: card shrinks up, address appears; beneficiary changes
+  const s2 = io(P(t, S[1], .9));
+  const s3 = io(P(t, S[2], .8));
+  c.card.style.opacity = cardIn * (1 - s3);
+  c.card.style.transform = `translateY(${(1 - cardIn) * 20 - 30 * s2}px) scale(${lerp(1, 0.86, s2)})`;
+  c.card.style.transformOrigin = '0 0';
+  const addrIn = eo(P(t, S[1] + 0.5, .7));
+  const changeAt = L[2] + 3.0;
+  const ch = P(t, changeAt, .5);
+  c.benv.textContent = ch > 0.5 ? '0xb0b0…0002' : '0xada0…0001';
+  c.ben.style.background = ch > 0 && ch < 1 ? 'rgba(185,242,124,.35)' : (t > changeAt && t < changeAt + 2.2 ? 'rgba(185,242,124,.25)' : 'transparent');
+  if (t < changeAt + 0.25) c.av.textContent = ADDR_A;
+  else if (t < changeAt + 0.9) { const k = Math.floor((t - changeAt) * 30); c.av.textContent = ADDR_A.split('').map((ch2, i) => (i > 1 && (i * 7 + k) % 3 === 0 ? '0123456789abcdef'[(i * 13 + k) % 16] : ch2)).join(''); }
+  else c.av.textContent = ADDR_B;
+  c.av.style.color = t > changeAt + 0.9 && t < changeAt + 2.0 ? 'var(--lime)' : '#F6F7F2';
+  show(c.nodeploy, eo(P(t, S[1] + 1.4, .5)) * (1 - s3), 10);
+  // step 3+: address moves down-left to make room, exchange sends
+  c.addr.style.opacity = addrIn;
+  const ax = lerp(640, 640, s3), aw = lerp(1140, 600, s3), ay = lerp(760, 730, s3);
+  c.addr.style.left = ax + 'px'; c.addr.style.top = ay + 'px'; c.addr.style.width = aw + 'px';
+  c.av.style.fontSize = lerp(40, 19, s3) + 'px';
+  show(c.ex, eo(P(t, S[2] + 0.3, .6)), 20);
+  show(c.noconn, eo(P(t, S[2] + 2.2, .5)), 10);
+  c.p3.style.opacity = eo(P(t, S[2] + 1.0, .4));
+  // token: exchange -> address (step 3), address -> vault (step 4)
+  const v3 = io(P(t, S[2] + 1.2, 1.6));
+  const v4 = io(P(t, S[3] + 1.6, 1.6));
+  c.p4a.style.strokeDashoffset = 100 * (1 - io(P(t, S[3] + 1.0, 1.2)));
+  show(c.vault, eo(P(t, S[3] + 0.2, .6)), 20); show(c.bot, eo(P(t, S[3] + 0.9, .5)), 10);
+  c.vault.querySelector('#cred').style.opacity = P(t, S[3] + 3.2, .4);
+  const ret = L[4] + 4.6; show(c.refund, eo(P(t, ret, .6)), 20); c.p4b.style.opacity = eo(P(t, ret + 0.3, .5));
+  let tp = null;
+  if (t > S[2] + 1.2 && t < S[2] + 2.9) tp = along([[1110, 380], [1180, 380], [1180, 760], [1210, 760]], v3);
+  else if (t > S[3] + 1.6 && t < S[3] + 3.3) tp = along([[1210, 790], [1290, 790], [1290, 300], [1360, 300]], v4);
+  c.tok.style.opacity = tp ? 1 : 0; if (tp) placeTok(c.tok, tp, 130, 46);
+});
+
+// ================================================================== 5. PRODUCT
+scene('product', 'light', (el) => {
+  const live = $(`<div class="abs" style="left:0;top:330px;width:1920px;text-align:center">
+     <div class="cap h1 forest">Live on Arc mainnet.</div>
+     <div class="mono" style="font-size:30px;margin-top:34px">Doorstep contract  0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229</div>
+     <div style="font-size:26px;color:var(--muted);margin-top:14px">Chain 5042 · verifiable on explorer.arc.io</div></div>`);
+  const br = $(`<div class="browser" style="left:150px;top:90px;width:1620px;height:960px"><div class="bar"><i></i><i></i><i></i><span>arcdoorstep.duckdns.org/app/</span></div><div class="vp"><img id="im"></div></div>`);
+  const tag = $(`<div class="tag l">Real interface · balances shown come from a test network</div>`);
+  const imgs = {};
+  for (const n of ['demo-address', 'demo-send', 'demo-delivered', 'demo-receipt']) { const im = new Image(); im.src = `/video/assets/screens/${n}.png`; imgs[n] = im; }
+  const three = $(`<div class="abs" style="left:150px;top:210px;width:1620px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px"></div>`);
+  const c1 = $(`<div class="card" style="padding:34px;height:620px">
+     <div style="font-size:26px;font-weight:700">SDK on npm</div><div class="muted" style="font-size:21px;margin-top:6px">doorstep-arc</div>
+     <pre class="mono" style="margin:26px 0 0;background:#0F1F19;color:#E3EEE6;border-radius:14px;padding:22px;font-size:19.5px;line-height:1.6;white-space:pre">npm install doorstep-arc viem
+
+const ds = createDoorstep();
+const invoice = ds.depositIntent({
+  into: vault,
+  beneficiary: customer,
+  refundTo: customer,
+  minimum: '25',
+});
+ds.depositAddress(invoice);</pre></div>`);
+  const c2 = $(`<div class="card" style="padding:34px;height:620px;overflow:hidden">
+     <div style="font-size:26px;font-weight:700">Hosted API</div><div class="muted" style="font-size:21px;margin-top:6px">invoices · signed webhooks · API keys</div>
+     <div style="margin-top:26px;border-radius:14px;overflow:hidden;border:1.5px solid var(--line);height:470px;position:relative"><img src="/video/assets/screens/api-docs.png" style="position:absolute;left:-40px;top:-10px;width:1000px"></div></div>`);
+  const c3 = $(`<div class="card" style="padding:34px;height:620px">
+     <div style="font-size:26px;font-weight:700">Delivery bot</div><div class="muted" style="font-size:21px;margin-top:6px">runs around the clock · anyone can run one</div>
+     <div style="margin-top:40px;font-size:22px;color:var(--muted)">On Arc mainnet, a payment made on the live site was found and delivered by the bot on its own:</div>
+     <div class="mono" style="margin-top:22px;font-size:21px;line-height:1.6;word-break:break-all;color:var(--forest)">tx 0x9213c520cdfb052882a5710e5c8eb54bb0a58d509c42223a7de998bcc670d554</div>
+     <div style="margin-top:22px;display:inline-flex" class="pill" ><span style="background:#E7F0E2;color:var(--forest);border-radius:999px;padding:8px 16px;font-size:21px">Landed · into the demo savings vault</span></div></div>`);
+  [c1, c2, c3].forEach((x) => three.appendChild(x));
+  [live, br, three, tag].forEach((e) => el.appendChild(e));
+  return { live, br, im: br.querySelector('#im'), imgs, three, cards: [c1, c2, c3], tag };
+}, (t, c, L) => {
+  const liveV = eo(P(t, 0.2, .7)) * (1 - P(t, L[1] - 0.4, .5));
+  show(c.live, liveV, 20);
+  const brV = eo(P(t, L[1] - 0.2, .7)) * (1 - P(t, L[4] - 0.3, .5));
+  show(c.br, brV, 40); c.tag.style.opacity = brV;
+  // which screenshot, and a slow camera move on it (scale, x, y in screenshot px)
+  let name, cam;
+  const k = (a, b, t0, d) => lerp(a, b, io(P(t, t0, d)));
+  if (t < L[2] - 0.1) { name = 'demo-address'; cam = [k(0.84, 1.0, L[1], 6), k(0, 60, L[1], 6), k(0, 40, L[1], 6)]; }
+  else if (t < L[2] + 1.4) { name = 'demo-send'; cam = [0.95, 120, 0]; }
+  else if (t < L[3] - 0.1) { name = 'demo-delivered'; cam = [k(0.95, 1.12, L[2] + 1.4, 3), k(120, 560, L[2] + 1.4, 3), k(0, 60, L[2] + 1.4, 3)]; }
+  else { name = 'demo-receipt'; cam = [k(1.0, 1.25, L[3], 4), k(0, 40, L[3], 4), k(260, 420, L[3], 4)]; }
+  const im = c.imgs[name];
+  if (c.im.getAttribute('src') !== im.src) c.im.src = im.src;
+  const vw = 1620; const base = vw / 1920;
+  c.im.style.transform = `scale(${base * cam[0]}) translate(${-cam[1]}px, ${-cam[2]}px)`;
+  const thV = eo(P(t, L[4] - 0.1, .6));
+  c.three.style.opacity = thV;
+  c.cards.forEach((cd, i) => show(cd, eo(P(t, L[4] + i * 0.5, .6)), 30));
+});
+
+// ================================================================== 6. ARC
+scene('arc', 'dark', (el) => {
+  const h1 = $(`<div class="abs cap h1" style="left:160px;top:130px">Built around Arc.</div>`);
+  const h2 = $(`<div class="abs cap h1 lime" style="left:160px;top:225px">Settled in USDC.</div>`);
+  const pay = $(`<div class="abs dcard" style="left:160px;top:470px;width:360px;padding:30px"><div class="label">Payment</div><div style="font-size:54px;font-weight:760;letter-spacing:-0.02em;margin-top:8px">25.00 <span style="font-size:26px;color:var(--fm)">USDC</span></div></div>`);
+  const dep = $(`<div class="abs" style="left:690px;top:478px;width:300px;height:140px;border-radius:22px;background:#1E5241;display:grid;place-items:center;box-shadow:0 0 0 2px rgba(185,242,124,.35)"><div class="mono" style="font-size:26px">deposit()</div></div>`);
+  const out1 = $(`<div class="abs dcard" style="left:1180px;top:410px;width:560px;padding:28px"><div class="label">Into the vault, for the payer</div><div style="font-size:50px;font-weight:760;letter-spacing:-0.02em;margin-top:6px">24.995 <span style="font-size:24px;color:var(--fm)">USDC</span></div></div>`);
+  const out2 = $(`<div class="abs dcard" style="left:1180px;top:620px;width:560px;padding:24px 28px;border-style:dashed"><div class="label">To the delivery bot · repays its gas, in USDC</div><div style="font-size:36px;font-weight:700;margin-top:6px;color:var(--lime)">≈ 0.005 <span style="font-size:22px;color:var(--fm)">USDC · capped by the instructions</span></div></div>`);
+  const svg = $(`<svg class="abs" style="left:0;top:0" width="1920" height="1080"><path id="a1" d="M520 548 H690" stroke="#B9F27C" stroke-width="4" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/><path id="a2" d="M990 530 C1080 530 1080 480 1180 480" stroke="#B9F27C" stroke-width="4" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/><path id="a3" d="M990 575 C1080 575 1080 680 1180 680" stroke="rgba(185,242,124,.6)" stroke-width="3" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg>`);
+  const chips = ['Second gas token', 'Price oracle', 'Token swap'].map((s, i) => { const d = $(`<div class="abs pill strike" style="left:${160 + i * 420}px;top:860px;background:rgba(246,247,242,.07);color:#DDE8E0;font-size:28px">No ${s.toLowerCase()}</div>`); el.appendChild(d); return d; });
+  const tag = $(`<div class="tag d">Illustrative amounts</div>`);
+  [svg, h1, h2, pay, dep, out1, out2, tag].forEach((e) => el.appendChild(e));
+  return { h1, h2, pay, dep, out1, out2, a1: svg.querySelector('#a1'), a2: svg.querySelector('#a2'), a3: svg.querySelector('#a3'), chips };
+}, (t, c, L) => {
+  show(c.h1, eo(P(t, 0.2, .7))); show(c.h2, eo(P(t, L[0] + 2.0, .7)));
+  show(c.pay, eo(P(t, L[1] - 0.2, .6)), 20);
+  [[c.a1, L[1] + 0.6], [c.a2, L[1] + 1.8], [c.a3, L[1] + 3.2]].forEach(([a, at]) => { a.style.opacity = t > at ? 1 : 0; });
+  c.a1.style.strokeDashoffset = 100 * (1 - io(P(t, L[1] + 0.6, .8)));
+  show(c.dep, eo(P(t, L[1] + 1.0, .5)), 10);
+  c.a2.style.strokeDashoffset = 100 * (1 - io(P(t, L[1] + 1.8, .8)));
+  show(c.out1, eo(P(t, L[1] + 2.2, .6)), 10, -20);
+  c.a3.style.strokeDashoffset = 100 * (1 - io(P(t, L[1] + 3.2, .8)));
+  show(c.out2, eo(P(t, L[1] + 3.6, .6)), 10, -20);
+  c.chips.forEach((ch, i) => { const at = L[2] + i * 0.75; show(ch, eo(P(t, at, .4)), 14); ch.style.setProperty('--s', io(P(t, at + 0.35, .35))); });
+});
+
+// ================================================================== 7. SECURITY
+scene('security', 'light', (el) => {
+  const title = $(`<div class="abs h2" style="left:160px;top:110px">What the contract guarantees</div>`);
+  const mk = (x, n, h, body) => $(`<div class="abs card" style="left:${x}px;top:250px;width:500px;height:500px;padding:36px"><div class="mono" style="color:var(--muted);font-size:22px">${n}</div><div style="font-size:34px;font-weight:720;letter-spacing:-0.01em;margin-top:10px;line-height:1.15">${h}</div>${body}</div>`);
+  const c1 = mk(160, '01', 'Two destinations', `
+    <svg width="430" height="230" style="margin-top:22px"><rect x="0" y="85" width="120" height="60" rx="14" fill="#153E31"/><text x="60" y="122" fill="#F6F7F2" font-family="M" font-size="17" text-anchor="middle">address</text>
+    <path d="M120 105 C200 105 200 40 270 40" stroke="#153E31" stroke-width="3.5" fill="none"/><rect x="270" y="10" width="160" height="60" rx="14" fill="#E7F0E2"/><text x="350" y="47" fill="#153E31" font-family="S" font-weight="700" font-size="20" text-anchor="middle">the contract</text>
+    <path d="M120 125 C200 125 200 190 270 190" stroke="#B4553E" stroke-width="3" fill="none" stroke-dasharray="8 8"/><rect x="270" y="160" width="160" height="60" rx="14" fill="#F6E7E2"/><text x="350" y="197" fill="#9A4434" font-family="S" font-weight="700" font-size="20" text-anchor="middle">refund wallet</text></svg>
+    <div style="font-size:22px;color:var(--muted);margin-top:16px;line-height:1.4">Plus a capped delivery fee. Nowhere else.</div>`);
+  const c2 = mk(710, '02', 'Bound to its instructions', `
+    <div style="margin-top:30px;font-size:21px;color:var(--muted)">beneficiary 0xada0…0001</div><div class="mono" style="font-size:21px;margin-top:6px;color:var(--forest)">→ 0xf962e1bd…F75d54</div>
+    <div style="margin-top:28px;font-size:21px;color:var(--muted)">beneficiary 0xb0b0…0002</div><div class="mono" style="font-size:21px;margin-top:6px;color:var(--forest)">→ 0x50b97b12…cE95e9</div>
+    <div style="font-size:22px;color:var(--muted);margin-top:40px;line-height:1.4">Change one detail and it's a different address. A handed-out address can't be redirected.</div>`);
+  const c3 = mk(1260, '03', 'No admin key', `
+    <div style="margin-top:30px;display:grid;gap:14px">${['No owner', 'No upgrade', 'No pause'].map((s) => `<div style="font-size:28px;font-weight:650;display:flex;gap:14px;align-items:center"><span style="width:12px;height:12px;border-radius:50%;background:var(--forest)"></span>${s}</div>`).join('')}</div>
+    <div class="mono" style="font-size:18px;margin-top:34px;color:var(--muted);word-break:break-all">0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229</div>
+    <div style="font-size:22px;color:var(--muted);margin-top:14px">Open source · MIT</div>`);
+  const disc = $(`<div class="abs" style="left:160px;top:810px;width:1600px;border-radius:18px;background:#FBF3E2;border:1.5px solid #EED6A4;padding:24px 32px;display:flex;gap:20px;align-items:center">
+     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#B07A16" stroke-width="2" stroke-linecap="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+     <div style="font-size:27px;line-height:1.35"><b>Not yet independently audited. Use small amounts.</b> <span class="muted">USDC on Arc only: other tokens sent to an address can't be recovered.</span></div></div>`);
+  [title, c1, c2, c3, disc].forEach((e) => el.appendChild(e));
+  return { title, cs: [c1, c2, c3], disc };
+}, (t, c, L) => {
+  show(c.title, eo(P(t, 0.1, .7)));
+  const at = [L[0] + 0.4, L[1] - 0.2, L[1] + 2.4];
+  c.cs.forEach((cd, i) => show(cd, eo(P(t, at[i], .7)), 30));
+  show(c.disc, eo(P(t, L[2] - 0.2, .7)), 20);
+});
+
+// ================================================================== 8. USES
+scene('uses', 'dark', (el) => {
+  const h = $(`<div class="abs cap h1" style="left:160px;top:120px">One address. Any app.</div>`);
+  const sub = $(`<div class="abs label" style="left:160px;top:220px;font-size:26px">Use cases the infrastructure supports</div>`);
+  const defs = [['vault', 'Savings vaults', 'Top up straight from an exchange'], ['escrow', 'Escrow', 'Fund a job without connecting a wallet'], ['invoice', 'Invoices & checkout', 'One address per order, exact amounts'], ['payroll', 'Payroll & top-ups', 'A permanent address per person'], ['agent', 'AI agents', 'Create, check and deliver payments']];
+  const tiles = defs.map(([ic, n, d], i) => { const x = $(`<div class="tile" style="left:${160 + i * 330}px;top:330px">${ICON[ic]}<h3>${n}</h3><p>${d}</p></div>`); el.appendChild(x); return x; });
+  const mcp = $(`<div class="abs" style="left:160px;top:640px;width:1600px;border-radius:22px;background:#0F2A21;border:1.5px solid rgba(185,242,124,.3);padding:32px 40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px">
+     ${[['create_payment_address', 'an address and pay link, within the operator\'s limits'], ['check_payment', 'status, and whether a link really credits who it claims'], ['deliver_payment', 'push a waiting payment into its contract']].map(([n, d]) => `<div><div class="mono lime" style="font-size:24px">${n}</div><div style="font-size:21px;color:var(--fm);margin-top:8px;line-height:1.35">${d}</div></div>`).join('')}</div>`);
+  const no = $(`<div class="abs pill" style="left:160px;top:870px;background:rgba(185,242,124,.14);color:var(--lime);font-size:26px">MCP server · no tool can send money anywhere else</div>`);
+  [h, sub, mcp, no].forEach((e) => el.appendChild(e));
+  return { h, sub, tiles, mcp, no };
+}, (t, c, L) => {
+  show(c.h, eo(P(t, L[0] - 0.1, .7))); show(c.sub, eo(P(t, L[0] + .6, .6)), 10);
+  const word = [L[1] + 0.05, L[1] + 0.85, L[1] + 1.55, L[1] + 2.3, L[2] + 0.2];
+  c.tiles.forEach((tl, i) => { show(tl, eo(P(t, word[i], .5)), 26); tl.style.borderColor = i === 4 && t > L[2] + 1 ? 'rgba(185,242,124,.6)' : ''; });
+  show(c.mcp, eo(P(t, L[2] + 1.6, .7)), 20);
+  show(c.no, eo(P(t, L[2] + 5.0, .6)), 10);
+});
+
+// ================================================================== 9. CLOSE
+scene('close', 'dark', (el) => {
+  const svg = $(`<svg class="abs" style="left:0;top:0" width="1920" height="1080">
+    <path id="big" d="M760 760V420a200 200 0 0 1 400 0v340" fill="none" stroke="#F6F7F2" stroke-width="22" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+    <path id="trail" d="M240 590 H1010" stroke="#B9F27C" stroke-width="10" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+    <circle id="bigdot" cx="1080" cy="700" r="0" fill="#B9F27C"/></svg>`);
+  const lock = $(`<div class="abs" style="left:0;top:0;width:1920px;height:1080px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+     <div style="display:flex;align-items:center;gap:30px">${LOGO(130)}<span style="font-size:118px;font-weight:760;letter-spacing:-0.045em">doorstep</span></div>
+     <div class="cap" style="margin-top:44px;font-size:58px;color:var(--lime)">Payments that find their way in.</div>
+     <div id="sec" style="margin-top:28px;font-size:32px;color:#DDE8E0">Live on Arc mainnet. Open source. Built for developers.</div></div>`);
+  const links = $(`<div class="abs mono" style="left:0;width:1920px;bottom:90px;display:flex;justify-content:center;gap:70px;font-size:30px;color:#DDE8E0"><span>arcdoorstep.duckdns.org</span><span>github.com/phoenix-2203/doorstep</span></div>`);
+  [svg, lock, links].forEach((e) => el.appendChild(e));
+  return { big: svg.querySelector('#big'), trail: svg.querySelector('#trail'), dot: svg.querySelector('#bigdot'), svg, lock, sec: lock.querySelector('#sec'), links };
+}, (t, c, L) => {
+  c.big.style.strokeDashoffset = 100 * (1 - io(P(t, 0.1, 1.6)));
+  c.trail.style.strokeDashoffset = 100 * (1 - io(P(t, L[0] + 0.6, 1.6)));
+  c.dot.setAttribute('r', 26 * eo(P(t, L[0] + 2.1, .4)));
+  const out = io(P(t, L[1] - 0.3, 1.0));
+  c.svg.style.opacity = 1 - out; c.svg.style.transform = `scale(${1 - 0.15 * out})`; c.svg.style.transformOrigin = '960px 560px';
+  show(c.lock, eo(P(t, L[1] + 0.2, .9)), 20);
+  c.sec.style.opacity = eo(P(t, L[1] + 1.6, .7));
+  show(c.links, eo(P(t, L[1] + 2.3, .7)), 10);
+});
+
+// ------------------------------------------------------------------ seek
+window.seek = (T) => {
+  for (const { s, el, draw } of Object.values(scenes)) {
+    const lt = T - s.start;
+    const X = TL.crossfade;
+    const vis = lt > -0.01 && lt < s.dur;
+    if (!vis) { el.style.opacity = 0; el.style.display = 'none'; continue; }
+    el.style.display = 'block';
+    const isFirst = s === TL.scenes[0], isLast = s === TL.scenes[TL.scenes.length - 1];
+    el.style.opacity = Math.min(isFirst ? 1 : clamp(lt / X), isLast ? 1 : clamp((s.dur - lt) / X));
+    draw(lt);
+  }
+};
+window.ready = Promise.all([document.fonts.ready, ...[...document.images].map((i) => i.decode().catch(() => {}))]);
+</script>
+</body></html>
