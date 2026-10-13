@@ -1,0 +1,19 @@
+{
+  "name": "doorstep-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server that lets AI agents create Doorstep payment addresses on Arc, check them and deliver payments, within the limits the instructions set.",
+  "type": "module",
+  "bin": {
+    "doorstep-mcp": "./server.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/local.test.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "viem": "^2.57.4",
+    "zod": "^4.6.7"
+  }
+}

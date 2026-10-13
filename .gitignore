@@ -13,3 +13,4 @@ sdk/node_modules/
 api/.env
 api/data/
 api/node_modules/
+agent/node_modules/
