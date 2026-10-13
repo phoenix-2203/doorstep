@@ -121,6 +121,8 @@ Arc's `Memo` and `Multicall3From` only accept EOA callers, and Doorstep is a con
 | `agent/` | MCP server for AI agents: create, check (and verify) and deliver Doorstep payments, within operator limits. See [agent/README.md](agent/README.md) |
 | `test/VaultFork.t.sol` | Delivers into a real Morpho USDC vault on a fork of Arc mainnet, then redeems and cancels |
 
+Security: not audited. What the contract guarantees, what it doesn't, and what each off-chain part could do if compromised: [SECURITY.md](SECURITY.md).
+
 ## What has been verified
 
 | Check | Where | Result |
