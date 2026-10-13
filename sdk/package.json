@@ -12,7 +12,7 @@
     "test:local": "node --test test/local.test.mjs"
   },
   "keywords": ["arc", "usdc", "circle", "deposit-address", "payments", "create2"],
-  "repository": { "type": "git", "url": "https://github.com/phoenix-2203/doorstep", "directory": "sdk" },
+  "repository": { "type": "git", "url": "git+https://github.com/phoenix-2203/doorstep.git", "directory": "sdk" },
   "license": "MIT",
   "peerDependencies": { "viem": "^2.21.0" },
   "devDependencies": { "viem": "2.57.4" }
