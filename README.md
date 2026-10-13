@@ -2,9 +2,9 @@
 
 **Let people pay into your Arc app from any wallet or exchange.** On Arc, a wallet's "Send USDC" can't pay into most vaults, escrows and checkouts, because they only accept money through their own deposit function. Doorstep gives each payer an address. Whatever arrives there is deposited into your contract, credited to the right person, within seconds, or sent back if that isn't possible.
 
-- **Website:** https://phoenix-2203.github.io/doorstep/ (what it is and how to integrate it)
-- **Try it:** https://phoenix-2203.github.io/doorstep/app/ (any visitor gets their own savings address on Arc mainnet and can top it up from any wallet or exchange)
-- **Build with it:** the [`doorstep-arc` SDK](sdk/README.md) (`npm install doorstep-arc viem`, [on npm](https://www.npmjs.com/package/doorstep-arc)), or the hosted HTTPS API with webhooks: https://api.104-251-218-80.sslip.io/docs ([api/](api/README.md); API keys on request)
+- **Website:** https://arcdoorstep.duckdns.org (what it is and how to integrate it; mirror: https://phoenix-2203.github.io/doorstep/)
+- **Try it:** https://arcdoorstep.duckdns.org/app/ (any visitor gets their own savings address on Arc mainnet and can top it up from any wallet or exchange)
+- **Build with it:** the [`doorstep-arc` SDK](sdk/README.md) (`npm install doorstep-arc viem`, [on npm](https://www.npmjs.com/package/doorstep-arc)), or the hosted HTTPS API with webhooks: https://api.arcdoorstep.duckdns.org/docs ([api/](api/README.md); API keys on request)
 - **Delivery:** a public delivery bot runs 24/7 for every registered address on Doorstep v2 (wallet [`0xd6aA…4497`](https://explorer.arc.io/address/0xd6aA9A15e5a95754F8B02a08A0C3E3CA7E614497)). Anyone can run another: [keeper/README.md](keeper/README.md)
 - **On Arc mainnet (chain 5042):** Doorstep v2 [`0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229`](https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229) · demo savings vault [`0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3`](https://explorer.arc.io/address/0x3da5F9d36d1AE8769A9460a7788a21c8041C7bB3) · v1 (no cancel, still works for its addresses) [`0xd614A7B602E1417F258A834465AE01F47891e080`](https://explorer.arc.io/address/0xd614A7B602E1417F258A834465AE01F47891e080)
 
@@ -136,7 +136,7 @@ Security: not audited. What the contract guarantees, what it doesn't, and what e
 | The same tests against live Arc mainnet state | `arc-forge test --fork-url https://rpc.mainnet.arc.io` | all pass (v1, 25 tests) |
 | Live runs on Arc mainnet: native send lands, ERC-20 transfer to the same address lands, expired intent bounces, early cancel refunds (v2) | `scripts/demo-mainnet.sh` | all pass, see [Mainnet proof](#mainnet-proof) |
 | Hosted API: invoice paid in two parts (part_paid, then delivered/paid), cancel (cancelled), both webhooks signed and verified; 401 without a key, 400 on bad input | `api/` on a local Arc node with the bot | all pass |
-| Hosted API live on mainnet: health check from outside, an address created and registered with an API key | https://api.104-251-218-80.sslip.io | works |
+| Hosted API live on mainnet: health check from outside, an address created and registered with an API key | https://api.arcdoorstep.duckdns.org | works |
 | Live site on mainnet: a visitor's savings address, paid from a wallet, delivered automatically by the bot | https://phoenix-2203.github.io/doorstep/ + `keeper/` | delivered, see [Mainnet proof](#mainnet-proof) |
 | AI-agent MCP server through a real MCP client: full invoice (part payment waits, then delivered and paid), a swapped beneficiary caught, a forged contract or chain refused, operator limits enforced | `agent/test/` on a local Arc node | 6 pass |
 | Live demo end to end in a headless browser: register, send a chosen amount, delivered with receipt and notice, under-minimum payment taken back, partial withdraw | `web/test/demo-flow.mjs` against an in-memory chain (no real money) | works |
