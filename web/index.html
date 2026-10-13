@@ -467,6 +467,7 @@ p { margin: 0; }
         <ul>
           <li><b>SDK.</b> Builds addresses offline, describes them in plain words, makes pay links, watches status, and can deliver or cancel.</li>
           <li><b>API.</b> Creates and registers an address, tracks invoices including part payments, and signs webhooks with HMAC-SHA256, retried for two hours. Needs an API key.</li>
+          <li><b>AI agents.</b> An MCP server gives agents three tools: create an address, check one (including whether a link someone sent really pays who it claims), and deliver. There's no tool that can send money anywhere else.</li>
           <li><b>Your contract.</b> Anything with <code>deposit(uint256 amount, address to)</code> that pulls with <code>transferFrom</code>, which includes ERC-4626 vaults. Other functions work through a custom call.</li>
         </ul>
         <div class="ctas">
@@ -479,6 +480,7 @@ p { margin: 0; }
           <button role="tab" aria-selected="true" aria-controls="code-sdk" id="tab-sdk">JavaScript SDK</button>
           <button role="tab" aria-selected="false" aria-controls="code-api" id="tab-api" tabindex="-1">HTTP API</button>
           <button role="tab" aria-selected="false" aria-controls="code-hook" id="tab-hook" tabindex="-1">Webhook</button>
+          <button role="tab" aria-selected="false" aria-controls="code-agent" id="tab-agent" tabindex="-1">AI agent</button>
         </div>
 <pre id="code-sdk" role="tabpanel" aria-labelledby="tab-sdk" tabindex="0"><span class="k">import</span> { createDoorstep } <span class="k">from</span> <span class="s">'doorstep-arc'</span>;
 
@@ -532,6 +534,24 @@ app.post(<span class="s">'/hooks/doorstep'</span>, express.raw({ type: <span cla
   <span class="k">if</span> (event.type === <span class="s">'payment.delivered'</span>) markPaid(event.data.reference);
   res.sendStatus(<span class="s">200</span>);
 });</pre>
+<pre id="code-agent" role="tabpanel" aria-labelledby="tab-agent" tabindex="0" hidden><span class="c"># Let an AI agent take payments, without being able to redirect them</span>
+claude mcp add doorstep -- node doorstep/agent/server.mjs
+
+<span class="c"># Tools: create_payment_address, check_payment, deliver_payment</span>
+<span class="c"># Operator limits: allowed contracts, fee cap, longest deadline</span>
+DOORSTEP_ALLOWED_TARGETS=0xYourVault
+DOORSTEP_MAX_FEE=0.02
+DOORSTEP_MAX_DAYS=90
+
+<span class="c">&gt; Make a 25 USDC invoice into 0xYourVault for 0xCustomer,</span>
+<span class="c">  refunds to 0xCustomer, reference inv-1042.</span>
+<span class="c">&gt; Before I pay this link, check it really credits me.</span>
+
+{
+  <span class="s">"address"</span>: <span class="s">"0x…"</span>,
+  <span class="s">"matchesExpectations"</span>: false,
+  <span class="s">"mismatches"</span>: [<span class="s">"credits 0x000…dEaD, not 0xYou…"</span>]
+}</pre>
         <div class="bar"><span id="copy-note" aria-live="polite"></span><button class="copy" type="button" id="copy">Copy code</button></div>
       </div>
     </div>
