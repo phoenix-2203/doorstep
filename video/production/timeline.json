@@ -1,0 +1,477 @@
+{
+ "scenes": [
+  {
+   "id": "hook",
+   "start": 0.0,
+   "dur": 14.991,
+   "lines": [
+    {
+     "at": 0.9,
+     "local": 0.9,
+     "dur": 1.981,
+     "text": "Here's something that should be simple.",
+     "file": "lines/00_00.wav"
+    },
+    {
+     "at": 3.431,
+     "local": 3.431,
+     "dur": 5.013,
+     "text": "You've got USDC on an exchange. You want it in a savings app on Arc.",
+     "file": "lines/00_01.wav"
+    },
+    {
+     "at": 9.344,
+     "local": 9.344,
+     "dur": 3.547,
+     "text": "So you send it\u2026 and the app has no idea it's yours.",
+     "file": "lines/00_02.wav"
+    }
+   ]
+  },
+  {
+   "id": "friction",
+   "start": 14.391,
+   "dur": 19.652,
+   "lines": [
+    {
+     "at": 14.891,
+     "local": 0.5,
+     "dur": 3.406,
+     "text": "Exchanges and wallets can only send to an address.",
+     "file": "lines/01_00.wav"
+    },
+    {
+     "at": 18.797,
+     "local": 4.406,
+     "dur": 8.707,
+     "text": "But apps keep money in smart contracts, and those only accept it through their own deposit function. That's how they know who to credit.",
+     "file": "lines/01_01.wav"
+    },
+    {
+     "at": 28.204,
+     "local": 13.813,
+     "dur": 4.639,
+     "text": "Sending is easy. Getting it into the right contract is the hard part.",
+     "file": "lines/01_02.wav"
+    }
+   ]
+  },
+  {
+   "id": "intro",
+   "start": 33.443,
+   "dur": 11.107,
+   "lines": [
+    {
+     "at": 34.143,
+     "local": 0.7,
+     "dur": 1.728,
+     "text": "Doorstep closes that gap.",
+     "file": "lines/02_00.wav"
+    },
+    {
+     "at": 36.471,
+     "local": 3.028,
+     "dur": 6.879,
+     "text": "It turns an ordinary USDC transfer into a proper deposit, credited to the right person.",
+     "file": "lines/02_01.wav"
+    }
+   ]
+  },
+  {
+   "id": "mechanism",
+   "start": 43.95,
+   "dur": 30.707,
+   "lines": [
+    {
+     "at": 44.35,
+     "local": 0.4,
+     "dur": 0.929,
+     "text": "Here's how.",
+     "file": "lines/03_00.wav"
+    },
+    {
+     "at": 45.779,
+     "local": 1.829,
+     "dur": 6.021,
+     "text": "First, the app sets the instructions: the contract, who gets credited, and where refunds go.",
+     "file": "lines/03_01.wav"
+    },
+    {
+     "at": 52.7,
+     "local": 8.75,
+     "dur": 5.072,
+     "text": "Those instructions produce an address. Change anything, and you get a different one.",
+     "file": "lines/03_02.wav"
+    },
+    {
+     "at": 58.672,
+     "local": 14.722,
+     "dur": 5.521,
+     "text": "The payer just sends their USDC there, from a wallet or straight from an exchange.",
+     "file": "lines/03_03.wav"
+    },
+    {
+     "at": 65.093,
+     "local": 21.143,
+     "dur": 8.164,
+     "text": "Then a delivery bot calls the contract's deposit function for them. If it can't, the money goes back to the refund wallet.",
+     "file": "lines/03_04.wav"
+    }
+   ]
+  },
+  {
+   "id": "product",
+   "start": 74.057,
+   "dur": 29.046,
+   "lines": [
+    {
+     "at": 74.557,
+     "local": 0.5,
+     "dur": 1.952,
+     "text": "And it's live on Arc mainnet.",
+     "file": "lines/04_00.wav"
+    },
+    {
+     "at": 77.109,
+     "local": 3.052,
+     "dur": 6.076,
+     "text": "In the demo, you get your own savings address, with a QR code and the instructions behind it.",
+     "file": "lines/04_01.wav"
+    },
+    {
+     "at": 84.085,
+     "local": 10.028,
+     "dur": 3.35,
+     "text": "Send a few cents, and watch it arrive in your savings.",
+     "file": "lines/04_02.wav"
+    },
+    {
+     "at": 88.335,
+     "local": 14.278,
+     "dur": 3.826,
+     "text": "Every payment gets a receipt, and Doorstep's cut is zero.",
+     "file": "lines/04_03.wav"
+    },
+    {
+     "at": 92.861,
+     "local": 18.804,
+     "dur": 8.942,
+     "text": "Behind it: an SDK on npm, a hosted API with signed webhooks, and a bot that runs around the clock.",
+     "file": "lines/04_04.wav"
+    }
+   ]
+  },
+  {
+   "id": "arc",
+   "start": 102.503,
+   "dur": 17.827,
+   "lines": [
+    {
+     "at": 103.003,
+     "local": 0.5,
+     "dur": 4.618,
+     "text": "Arc is what makes this practical, because gas is paid in USDC.",
+     "file": "lines/05_00.wav"
+    },
+    {
+     "at": 108.221,
+     "local": 5.718,
+     "dur": 6.527,
+     "text": "The bot spends USDC to deliver, and it's repaid in USDC from the payment, with a cap.",
+     "file": "lines/05_01.wav"
+    },
+    {
+     "at": 115.348,
+     "local": 12.845,
+     "dur": 3.582,
+     "text": "No second token. No price oracle. No swaps.",
+     "file": "lines/05_02.wav"
+    }
+   ]
+  },
+  {
+   "id": "security",
+   "start": 119.73,
+   "dur": 19.183,
+   "lines": [
+    {
+     "at": 120.23,
+     "local": 0.5,
+     "dur": 8.639,
+     "text": "Apart from that capped fee, money only goes two places: into the contract in the instructions, or back to the refund wallet.",
+     "file": "lines/06_00.wav"
+    },
+    {
+     "at": 129.569,
+     "local": 9.839,
+     "dur": 4.246,
+     "text": "Nobody can redirect a payment, and there's no admin key at all.",
+     "file": "lines/06_01.wav"
+    },
+    {
+     "at": 134.615,
+     "local": 14.885,
+     "dur": 2.998,
+     "text": "It isn't audited yet, so keep the amounts small.",
+     "file": "lines/06_02.wav"
+    }
+   ]
+  },
+  {
+   "id": "uses",
+   "start": 138.313,
+   "dur": 17.458,
+   "lines": [
+    {
+     "at": 138.713,
+     "local": 0.4,
+     "dur": 3.208,
+     "text": "And because it's just an address, any app can use it.",
+     "file": "lines/07_00.wav"
+    },
+    {
+     "at": 142.421,
+     "local": 4.108,
+     "dur": 2.81,
+     "text": "Savings. Escrow. Invoices. Payroll.",
+     "file": "lines/07_01.wav"
+    },
+    {
+     "at": 145.831,
+     "local": 7.518,
+     "dur": 8.64,
+     "text": "Even AI agents: our MCP server lets them create, check and deliver payments, but never send money anywhere else.",
+     "file": "lines/07_02.wav"
+    }
+   ]
+  },
+  {
+   "id": "close",
+   "start": 155.171,
+   "dur": 11.511,
+   "lines": [
+    {
+     "at": 155.971,
+     "local": 0.8,
+     "dur": 2.438,
+     "text": "Your users' money is already out there.",
+     "file": "lines/08_00.wav"
+    },
+    {
+     "at": 159.009,
+     "local": 3.838,
+     "dur": 1.673,
+     "text": "Doorstep gives it a way in.",
+     "file": "lines/08_01.wav"
+    }
+   ]
+  }
+ ],
+ "lines": [
+  {
+   "scene": "hook",
+   "at": 0.9,
+   "dur": 1.981,
+   "text": "Here's something that should be simple.",
+   "file": "lines/00_00.wav"
+  },
+  {
+   "scene": "hook",
+   "at": 3.431,
+   "dur": 5.013,
+   "text": "You've got USDC on an exchange. You want it in a savings app on Arc.",
+   "file": "lines/00_01.wav"
+  },
+  {
+   "scene": "hook",
+   "at": 9.344,
+   "dur": 3.547,
+   "text": "So you send it\u2026 and the app has no idea it's yours.",
+   "file": "lines/00_02.wav"
+  },
+  {
+   "scene": "friction",
+   "at": 14.891,
+   "dur": 3.406,
+   "text": "Exchanges and wallets can only send to an address.",
+   "file": "lines/01_00.wav"
+  },
+  {
+   "scene": "friction",
+   "at": 18.797,
+   "dur": 8.707,
+   "text": "But apps keep money in smart contracts, and those only accept it through their own deposit function. That's how they know who to credit.",
+   "file": "lines/01_01.wav"
+  },
+  {
+   "scene": "friction",
+   "at": 28.204,
+   "dur": 4.639,
+   "text": "Sending is easy. Getting it into the right contract is the hard part.",
+   "file": "lines/01_02.wav"
+  },
+  {
+   "scene": "intro",
+   "at": 34.143,
+   "dur": 1.728,
+   "text": "Doorstep closes that gap.",
+   "file": "lines/02_00.wav"
+  },
+  {
+   "scene": "intro",
+   "at": 36.471,
+   "dur": 6.879,
+   "text": "It turns an ordinary USDC transfer into a proper deposit, credited to the right person.",
+   "file": "lines/02_01.wav"
+  },
+  {
+   "scene": "mechanism",
+   "at": 44.35,
+   "dur": 0.929,
+   "text": "Here's how.",
+   "file": "lines/03_00.wav"
+  },
+  {
+   "scene": "mechanism",
+   "at": 45.779,
+   "dur": 6.021,
+   "text": "First, the app sets the instructions: the contract, who gets credited, and where refunds go.",
+   "file": "lines/03_01.wav"
+  },
+  {
+   "scene": "mechanism",
+   "at": 52.7,
+   "dur": 5.072,
+   "text": "Those instructions produce an address. Change anything, and you get a different one.",
+   "file": "lines/03_02.wav"
+  },
+  {
+   "scene": "mechanism",
+   "at": 58.672,
+   "dur": 5.521,
+   "text": "The payer just sends their USDC there, from a wallet or straight from an exchange.",
+   "file": "lines/03_03.wav"
+  },
+  {
+   "scene": "mechanism",
+   "at": 65.093,
+   "dur": 8.164,
+   "text": "Then a delivery bot calls the contract's deposit function for them. If it can't, the money goes back to the refund wallet.",
+   "file": "lines/03_04.wav"
+  },
+  {
+   "scene": "product",
+   "at": 74.557,
+   "dur": 1.952,
+   "text": "And it's live on Arc mainnet.",
+   "file": "lines/04_00.wav"
+  },
+  {
+   "scene": "product",
+   "at": 77.109,
+   "dur": 6.076,
+   "text": "In the demo, you get your own savings address, with a QR code and the instructions behind it.",
+   "file": "lines/04_01.wav"
+  },
+  {
+   "scene": "product",
+   "at": 84.085,
+   "dur": 3.35,
+   "text": "Send a few cents, and watch it arrive in your savings.",
+   "file": "lines/04_02.wav"
+  },
+  {
+   "scene": "product",
+   "at": 88.335,
+   "dur": 3.826,
+   "text": "Every payment gets a receipt, and Doorstep's cut is zero.",
+   "file": "lines/04_03.wav"
+  },
+  {
+   "scene": "product",
+   "at": 92.861,
+   "dur": 8.942,
+   "text": "Behind it: an SDK on npm, a hosted API with signed webhooks, and a bot that runs around the clock.",
+   "file": "lines/04_04.wav"
+  },
+  {
+   "scene": "arc",
+   "at": 103.003,
+   "dur": 4.618,
+   "text": "Arc is what makes this practical, because gas is paid in USDC.",
+   "file": "lines/05_00.wav"
+  },
+  {
+   "scene": "arc",
+   "at": 108.221,
+   "dur": 6.527,
+   "text": "The bot spends USDC to deliver, and it's repaid in USDC from the payment, with a cap.",
+   "file": "lines/05_01.wav"
+  },
+  {
+   "scene": "arc",
+   "at": 115.348,
+   "dur": 3.582,
+   "text": "No second token. No price oracle. No swaps.",
+   "file": "lines/05_02.wav"
+  },
+  {
+   "scene": "security",
+   "at": 120.23,
+   "dur": 8.639,
+   "text": "Apart from that capped fee, money only goes two places: into the contract in the instructions, or back to the refund wallet.",
+   "file": "lines/06_00.wav"
+  },
+  {
+   "scene": "security",
+   "at": 129.569,
+   "dur": 4.246,
+   "text": "Nobody can redirect a payment, and there's no admin key at all.",
+   "file": "lines/06_01.wav"
+  },
+  {
+   "scene": "security",
+   "at": 134.615,
+   "dur": 2.998,
+   "text": "It isn't audited yet, so keep the amounts small.",
+   "file": "lines/06_02.wav"
+  },
+  {
+   "scene": "uses",
+   "at": 138.713,
+   "dur": 3.208,
+   "text": "And because it's just an address, any app can use it.",
+   "file": "lines/07_00.wav"
+  },
+  {
+   "scene": "uses",
+   "at": 142.421,
+   "dur": 2.81,
+   "text": "Savings. Escrow. Invoices. Payroll.",
+   "file": "lines/07_01.wav"
+  },
+  {
+   "scene": "uses",
+   "at": 145.831,
+   "dur": 8.64,
+   "text": "Even AI agents: our MCP server lets them create, check and deliver payments, but never send money anywhere else.",
+   "file": "lines/07_02.wav"
+  },
+  {
+   "scene": "close",
+   "at": 155.971,
+   "dur": 2.438,
+   "text": "Your users' money is already out there.",
+   "file": "lines/08_00.wav"
+  },
+  {
+   "scene": "close",
+   "at": 159.009,
+   "dur": 1.673,
+   "text": "Doorstep gives it a way in.",
+   "file": "lines/08_01.wav"
+  }
+ ],
+ "total": 166.682,
+ "crossfade": 0.6
+}
