@@ -58,6 +58,65 @@ const usd = (s) => Number(s).toLocaleString(undefined, { maximumFractionDigits: 
 const errText = (e) => e?.shortMessage ?? e?.message ?? String(e);
 const say = (id, html, err) => { const el = $(id); el.className = err ? 'msg err' : 'msg'; el.innerHTML = html; };
 
+// ---------------------------------------------------------------- "it landed" notices
+// Always: a toast on the page. If the visitor turned notices on: a short chime, a system
+// notification when the tab is in the background, and the tab title.
+const notices = { on: store.get('doorstep:notify') === '1', audio: null };
+function chime() {
+  try {
+    notices.audio ||= new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = notices.audio;
+    [880, 1320].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f;
+      o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + i * 0.12 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.12 + 0.35);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + i * 0.12);
+      o.stop(ctx.currentTime + i * 0.12 + 0.4);
+    });
+  } catch { /* no audio: the toast is enough */ }
+}
+let toastTimer;
+function notify(text) {
+  const t = $('toast');
+  if (t) {
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 6000);
+  }
+  if (!notices.on) return;
+  chime();
+  if (document.hidden) {
+    const title = document.title;
+    document.title = `● ${text}`;
+    const back = () => { if (!document.hidden) { document.title = title; document.removeEventListener('visibilitychange', back); } };
+    document.addEventListener('visibilitychange', back);
+    try { if (window.Notification?.permission === 'granted') new Notification('Doorstep', { body: text, icon: '../brand/icon.svg' }); } catch { /* fine */ }
+  }
+}
+function setupNotifyButton(id) {
+  const b = $(id);
+  if (!b) return;
+  const label = () => {
+    b.textContent = notices.on ? 'Notifications on' : 'Notify me when it lands';
+    b.setAttribute('aria-pressed', String(notices.on));
+  };
+  label();
+  b.onclick = async () => {
+    notices.on = !notices.on;
+    store.set('doorstep:notify', notices.on ? '1' : '0');
+    if (notices.on) {
+      chime(); // also unlocks audio for later
+      try { if (window.Notification && Notification.permission === 'default') await Notification.requestPermission(); } catch { /* fine */ }
+    }
+    label();
+  };
+}
+
 // ---------------------------------------------------------------- wallet
 
 let wallet;
@@ -105,13 +164,15 @@ function namesFor(intent, { you } = {}) {
   return n;
 }
 
-async function withdrawAll(ds, owner, msgId, after) {
+async function withdrawAll(ds, owner, msgId, after, want6) {
   const w = await connect(ds);
   if (w.account.address !== owner) {
     throw new Error(`This balance belongs to ${short(owner)}, but your wallet is connected as ${short(w.account.address)}. Switch to that account in your wallet and try again.`);
   }
-  const amount = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [owner] });
-  if (amount === 0n) throw new Error('Nothing to withdraw yet.');
+  const held = await ds.publicClient.readContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'balanceOf6', args: [owner] });
+  if (held === 0n) throw new Error('Nothing to withdraw yet.');
+  if (want6 !== undefined && want6 > held) throw new Error(`You have ${formatUsdc6(held)} USDC in savings; enter that or less.`);
+  const amount = want6 ?? held;
   say(msgId, `Withdrawing ${formatUsdc6(amount)} USDC. Confirm in your wallet…`);
   const hash = await w.writeContract({ address: ESCROW, abi: ESCROW_ABI, functionName: 'withdraw', args: [amount, owner] });
   say(msgId, `Sent, confirming… ${link('tx/' + hash, 'View transaction')}`);
@@ -137,6 +198,41 @@ const savingsIntent = (owner) => depositIntent({
 async function initHome() {
   $('home-view').hidden = false;
   $('nav-home').setAttribute('aria-current', 'page');
+  // "Why it matters": without / with Doorstep.
+  for (const [btn, show] of [['cmp-without', 'flow-without'], ['cmp-with', 'flow-with']]) {
+    $(btn).onclick = () => {
+      for (const [b, f] of [['cmp-without', 'flow-without'], ['cmp-with', 'flow-with']]) {
+        $(b).setAttribute('aria-selected', String(b === btn));
+        $(f).hidden = f !== show;
+      }
+    };
+  }
+  setupNotifyButton('btn-notify');
+  // Amount to send.
+  const amountInput = $('home-amount');
+  const syncAmount = () => {
+    const v = amountInput.value.trim();
+    const n = Number(v);
+    const ok = v !== '' && Number.isFinite(n) && n > 0;
+    $('btn-home-pay').textContent = ok ? `Send ${v} USDC` : 'Send USDC';
+    for (const c of document.querySelectorAll('.chip-btn')) c.setAttribute('aria-pressed', String(c.dataset.amt === v));
+    const hint = $('amount-hint');
+    if (ok && n < 0.01) {
+      hint.className = 'hint warn';
+      hint.textContent = `${v} USDC is under the 0.01 minimum, so it will wait at your address. You can take it back at any time with no fee.`;
+    } else {
+      hint.className = 'hint';
+      hint.textContent = '0.01 USDC or more is delivered. Less waits at the address until more arrives, or until you take it back.';
+    }
+    return ok;
+  };
+  amountInput.addEventListener('input', syncAmount);
+  for (const c of document.querySelectorAll('.chip-btn')) c.onclick = () => { amountInput.value = c.dataset.amt; syncAmount(); };
+  syncAmount();
+  const track = (sent, arrived, saved) => {
+    const set = (id, st) => { $(id).className = st || ''; };
+    set('tr-sent', sent); set('tr-arrived', arrived); set('tr-saved', saved);
+  };
   const ds = clientFor(getAddress(params.get('doorstep') ?? CONFIG.doorstep));
   let intent;
   let dep;
@@ -198,6 +294,8 @@ async function initHome() {
     $('home-slot').hidden = false;
     $('btn-home-pay').disabled = false;
     $('btn-home-copy').disabled = false;
+    amountInput.disabled = false;
+    for (const c of document.querySelectorAll('.chip-btn')) c.disabled = false;
     $('home-light').textContent = 'Ready for payments';
   }
 
@@ -219,12 +317,31 @@ async function initHome() {
   };
   $('btn-home-pay').onclick = async () => {
     try {
-      const amount = prompt('How much USDC to send to your savings address?', '0.05');
-      if (!amount) return;
+      if (!syncAmount()) throw new Error('Enter an amount of USDC to send.');
+      const amount = amountInput.value.trim();
       const w = await connect(ds);
+      say('s3-msg', `Confirm sending ${esc(amount)} USDC in your wallet…`);
+      // A plain transfer, exactly what any wallet's Send button or an exchange withdrawal does.
       const tx = await w.sendTransaction({ to: dep, value: parseUnits(amount, 18) });
-      say('s3-msg', `Sent. ${link('tx/' + tx, 'View transaction')}`);
+      say('s3-msg', `Sent ${esc(amount)} USDC. ${link('tx/' + tx, 'View transaction')}`);
+      track('done', 'now', '');
+      mark(3, 'done'); mark(4, 'now');
+      $('s4-status').textContent = 'Waiting for your payment to arrive at your address…';
     } catch (e) { say('s3-msg', esc(errText(e)), true); }
+  };
+  $('btn-home-cancel').onclick = async () => {
+    try {
+      const w = await connect(ds);
+      if (w.account.address !== intent.refundTo) throw new Error(`Switch your wallet to ${short(intent.refundTo)}: only the owner of this savings address can take money back.`);
+      say('s4-msg', 'Taking it back… confirm in your wallet.');
+      const { hash, event } = await ds.cancel(intent, { walletClient: w });
+      say('s4-msg', `Done: ${usd(formatUsdc18(event?.refunded ?? 0n))} USDC is back in your wallet, no fee taken. ${link('tx/' + hash, 'View transaction')}`);
+      $('btn-home-cancel').hidden = true;
+      refresh();
+    } catch (e) {
+      const t = errText(e);
+      say('s4-msg', /NothingToLand|nothing/i.test(t) ? 'Nothing is waiting any more: it was probably delivered a moment ago.' : esc(t), true);
+    }
   };
   $('btn-home-copy').onclick = async () => {
     try { await navigator.clipboard.writeText(dep); say('s3-msg', 'Address copied. Paste it into any wallet or exchange withdrawal, on the Arc network.'); } catch (e) { say('s3-msg', esc(errText(e)), true); }
@@ -241,7 +358,13 @@ async function initHome() {
     } catch (e) { say('s4-msg', esc(errText(e)), true); }
   };
   $('btn-home-withdraw').onclick = async () => {
-    try { await withdrawAll(ds, intent.refundTo, 's4-msg', refresh); } catch (e) { say('s4-msg', esc(errText(e)), true); }
+    try {
+      const v = $('home-wd-amount').value.trim();
+      const want6 = v ? toUnits6(v, 'amount') : undefined;
+      if (want6 === 0n) throw new Error('Enter an amount above 0, or leave it empty to withdraw everything.');
+      await withdrawAll(ds, intent.refundTo, 's5-msg', refresh, want6);
+      $('home-wd-amount').value = '';
+    } catch (e) { say('s5-msg', esc(errText(e)), true); }
   };
 
   // Two cheap reads per round: what's waiting at the address, and the savings balance. A delivery
@@ -272,6 +395,10 @@ async function initHome() {
     }
     $('home-balance').textContent = `${usd(formatUsdc6(bal))} USDC`;
     $('btn-home-withdraw').disabled = bal === 0n;
+    $('home-wd-amount').disabled = bal === 0n;
+    $('btn-home-cancel').hidden = waiting === 0n;
+    if (balanceRose && tickNo > 1) notify(`${usd(formatUsdc6(bal - (bal - lastDelivered)))} USDC is in your savings`);
+    renderReceipts();
     const door = $('door-home');
     const last = events[events.length - 1];
     const belowMinimum = waiting / 10n ** 12n < intent.minAmount6;
@@ -283,6 +410,7 @@ async function initHome() {
         ? `${amt} USDC arrived. That's under the 0.01 USDC minimum, so it waits for more.`
         : `${amt} USDC arrived. Delivering it into your savings…`;
       mark(3, 'done'); mark(4, 'now');
+      track('done', belowMinimum ? 'now' : 'done', belowMinimum ? '' : 'now');
       arrivedAt ||= Date.now();
       const slow = !belowMinimum && Date.now() - arrivedAt > SLOW_MS;
       $('btn-home-deliver').hidden = !slow;
@@ -302,10 +430,33 @@ async function initHome() {
         $('s4-status').innerHTML = `Last payment: ${amount} USDC delivered into your savings.${fee}`;
       }
       mark(3, 'done'); mark(4, 'done');
+      track('done', 'done', returned ? '' : 'done');
+      if (returned && !notifiedReturn.has(last.transactionHash)) {
+        if (tickNo > 1) notify(`${usd(formatUsdc18(last.refunded))} USDC went back to your wallet`);
+        notifiedReturn.add(last.transactionHash);
+      }
     } else {
       door.dataset.state = 'idle';
       $('home-light').textContent = 'Ready for payments';
     }
+  }
+
+  const notifiedReturn = new Set();
+  function renderReceipts() {
+    const list = $('home-activity');
+    if (!events.length) return;
+    list.innerHTML = [...events].reverse().map((e) => {
+      const tx = link('tx/' + e.transactionHash, 'View on the Arc explorer');
+      if (e.event === 'Landed') {
+        const fee = usd(formatUsdc18(e.keeperFee));
+        const back = e.refunded > 0n ? usd(formatUsdc18(e.refunded)) : '0';
+        return `<li><details><summary><span class="chip ok">Delivered</span><b>${usd(formatUsdc6(e.amountPulled6))} USDC</b><span class="when">block ${e.blockNumber}</span></summary>
+          <dl class="facts rcpt"><div><dt>Into your savings</dt><dd>${usd(formatUsdc6(e.amountPulled6))} USDC</dd></div><div><dt>Network fee</dt><dd>${fee} USDC, paid to the delivery bot from the payment</dd></div><div><dt>Unused fee allowance</dt><dd>${back} USDC, sent back to your wallet</dd></div><div><dt>Doorstep's cut</dt><dd>0</dd></div><div><dt>Transaction</dt><dd>${tx}</dd></div></dl></details></li>`;
+      }
+      const why = e.reasonText === 'cancelled' ? 'You took it back' : e.reasonText === 'expired' ? 'The address had expired' : 'The vault refused it';
+      return `<li><details><summary><span class="chip back">Returned</span><b>${usd(formatUsdc18(e.refunded))} USDC</b><span class="when">block ${e.blockNumber}</span></summary>
+        <dl class="facts rcpt"><div><dt>Why</dt><dd>${why}</dd></div><div><dt>Sent back to</dt><dd class="mono">${esc(e.refundTo)}</dd></div><div><dt>Network fee</dt><dd>${usd(formatUsdc18(e.keeperFee))} USDC</dd></div><div><dt>Transaction</dt><dd>${tx}</dd></div></dl></details></li>`;
+    }).join('');
   }
 
   let looping = false;
