@@ -1,0 +1,8 @@
+production/part*.mp4
+production/frames.mp4
+production/parts.txt
+production/stills/
+production/check/
+production/*.log
+assets/audio/*.wav
+Doorstep_Voiceover.wav
