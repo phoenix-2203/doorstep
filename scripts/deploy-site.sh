@@ -5,8 +5,8 @@
 set -euo pipefail
 REPO="${REPO:-/home/doorstep/doorstep}"
 DEST="${DEST:-/var/www/arcdoorstep}"
-sudo -u doorstep git -C "$REPO" pull --ff-only
+runuser -u doorstep -- git -C "$REPO" pull --ff-only
 mkdir -p "$DEST"
 cp -r "$REPO/web/dist/." "$DEST/"
 chmod -R a+rX "$DEST"
-echo "Site published to $DEST from $(sudo -u doorstep git -C "$REPO" log -1 --format='%h %s')"
+echo "Site published to $DEST from $(runuser -u doorstep -- git -C "$REPO" log -1 --format='%h %s')"
