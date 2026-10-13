@@ -33,12 +33,13 @@ const bundle = (entry) => {
 // Brand files and fonts.
 fs.mkdirSync('dist/brand/fonts', { recursive: true });
 for (const f of fs.readdirSync('brand')) {
-  if (/\.(svg|png|css)$/.test(f)) fs.copyFileSync(`brand/${f}`, `dist/brand/${f}`);
+  if (/\.(svg|png|css|js)$/.test(f)) fs.copyFileSync(`brand/${f}`, `dist/brand/${f}`);
 }
 for (const f of [
   'node_modules/@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2',
   'node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2',
 ]) fs.copyFileSync(f, `dist/brand/fonts/${f.split('/').pop()}`);
+const themeHash = crypto.createHash('sha256').update(fs.readFileSync('brand/theme.js')).digest('hex').slice(0, 8);
 const cssHash = crypto.createHash('sha256').update(fs.readFileSync('brand/brand.css')).digest('hex').slice(0, 8);
 
 for (const [page, entry, prefix] of [
@@ -50,7 +51,7 @@ for (const [page, entry, prefix] of [
   if (!html.includes(tag)) throw new Error(`${page} must load ./${entry}`);
   if (!html.includes('brand/brand.css"')) throw new Error(`${page} must link brand/brand.css`);
   const { file, kb } = bundle(entry);
-  html = html.replace(tag, `src="${prefix}${file}"`).replace('brand/brand.css"', `brand/brand.css?v=${cssHash}"`);
+  html = html.replace(tag, `src="${prefix}${file}"`).replace('brand/brand.css"', `brand/brand.css?v=${cssHash}"`).replace('brand/theme.js"', `brand/theme.js?v=${themeHash}"`);
   fs.mkdirSync(`dist/${page}`.replace(/\/[^/]+$/, ''), { recursive: true });
   fs.writeFileSync(`dist/${page}`, html);
   console.log(`dist/${page} -> ${file} (${kb} kB)`);
