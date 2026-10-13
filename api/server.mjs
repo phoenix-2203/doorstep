@@ -32,7 +32,7 @@ const RPC_URL = env('RPC_URL', 'https://rpc.mainnet.arc.io');
 const READ_RPC_URL = env('READ_RPC_URL', CHAIN_ID === 5042 ? 'https://rpc.mainnet.arc.io' : RPC_URL);
 const DOORSTEP = getAddress(env('DOORSTEP', '0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229'));
 const FROM_BLOCK = BigInt(env('FROM_BLOCK', '25509432'));
-const PAY_BASE = env('PAY_BASE', 'https://phoenix-2203.github.io/doorstep/app/');
+const PAY_BASE = env('PAY_BASE', 'https://arcdoorstep.duckdns.org/app/');
 const EXPLORER = env('EXPLORER', 'https://explorer.arc.io');
 const DATA_DIR = home(env('DATA_DIR', new URL('./data', import.meta.url).pathname));
 const POLL_MS = Number(env('POLL_MS', 10_000));

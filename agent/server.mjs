@@ -40,7 +40,7 @@ const dep = DEPLOYMENTS[chainId];
 const DOOR = getAddress(env('DOORSTEP', dep?.doorstep ?? ''));
 const FROM_BLOCK = BigInt(env('DOORSTEP_FROM_BLOCK', String(dep?.fromBlock ?? 0n)));
 const RPC_URL = env('DOORSTEP_RPC_URL', chainId === 5042 ? 'https://rpc.mainnet.arc.io' : 'http://127.0.0.1:8545');
-const PAY_BASE = env('DOORSTEP_PAY_BASE', 'https://phoenix-2203.github.io/doorstep/app/');
+const PAY_BASE = env('DOORSTEP_PAY_BASE', 'https://arcdoorstep.duckdns.org/app/');
 const ALLOWED = env('DOORSTEP_ALLOWED_TARGETS', '').split(',').map((s) => s.trim()).filter(Boolean).map((a) => getAddress(a));
 const MAX_FEE6 = toUnits6(env('DOORSTEP_MAX_FEE', '0.02'), 'DOORSTEP_MAX_FEE');
 const MAX_DAYS = Number(env('DOORSTEP_MAX_DAYS', '90'));
