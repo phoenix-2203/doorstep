@@ -1,0 +1,163 @@
+[
+ {
+  "scene": "hook",
+  "lines": [
+   {
+    "text": "Here's something that should be simple.",
+    "say": "Here's something that should be simple."
+   },
+   {
+    "text": "You've got USDC on an exchange. You want it in a savings app on Arc.",
+    "say": "You've got U-S-D-C on an exchange. You want it in a savings app on Arc."
+   },
+   {
+    "text": "So you send it… and the app has no idea it's yours.",
+    "say": "So you send it... and the app has no idea it's yours."
+   }
+  ]
+ },
+ {
+  "scene": "friction",
+  "lines": [
+   {
+    "text": "Exchanges and wallets can only send to an address.",
+    "say": "Exchanges and wallets can only send to an address."
+   },
+   {
+    "text": "But apps keep money in smart contracts, and those only accept it through their own deposit function. That's how they know who to credit.",
+    "say": "But apps keep money in smart contracts, and those only accept it through their own deposit function. That's how they know who to credit."
+   },
+   {
+    "text": "Sending is easy. Getting it into the right contract is the hard part.",
+    "say": "Sending is easy. Getting it into the right contract, that's the hard part."
+   }
+  ]
+ },
+ {
+  "scene": "intro",
+  "lines": [
+   {
+    "text": "Doorstep closes that gap.",
+    "say": "Doorstep closes that gap."
+   },
+   {
+    "text": "It turns an ordinary USDC transfer into a proper deposit, credited to the right person.",
+    "say": "It turns an ordinary U-S-D-C transfer into a proper deposit, credited to the right person."
+   }
+  ]
+ },
+ {
+  "scene": "mechanism",
+  "lines": [
+   {
+    "text": "Here's how.",
+    "say": "Here's how."
+   },
+   {
+    "text": "First, the app sets the instructions: the contract, who gets credited, and where refunds go.",
+    "say": "First, the app sets the instructions. The contract, who gets credited, and where refunds go."
+   },
+   {
+    "text": "Those instructions produce an address. Change anything, and you get a different one.",
+    "say": "Those instructions produce an address. Change anything, and you get a different one."
+   },
+   {
+    "text": "The payer just sends their USDC there, from a wallet or straight from an exchange.",
+    "say": "The payer just sends their U-S-D-C there, from a wallet, or straight from an exchange."
+   },
+   {
+    "text": "Then a delivery bot calls the contract's deposit function for them. If it can't, the money goes back to the refund wallet.",
+    "say": "Then a delivery bot calls the contract's deposit function for them. If it can't, the money goes back to the refund wallet."
+   }
+  ]
+ },
+ {
+  "scene": "product",
+  "lines": [
+   {
+    "text": "And it's live on Arc mainnet.",
+    "say": "And it's live, on Arc main-net."
+   },
+   {
+    "text": "In the demo, you get your own savings address, with a QR code and the instructions behind it.",
+    "say": "In the demo, you get your own savings address, with a QR code, and the instructions behind it."
+   },
+   {
+    "text": "Send a few cents, and watch it arrive in your savings.",
+    "say": "Send a few cents, and watch it arrive in your savings."
+   },
+   {
+    "text": "Every payment gets a receipt, and Doorstep's cut is zero.",
+    "say": "Every payment gets a receipt. And Doorstep's cut, is zero."
+   },
+   {
+    "text": "Behind it: an SDK on npm, a hosted API with signed webhooks, and a bot that runs around the clock.",
+    "say": "Behind it, there's an S-D-K on N-P-M, a hosted A-P-I with signed webhooks, and a bot that runs around the clock."
+   }
+  ]
+ },
+ {
+  "scene": "arc",
+  "lines": [
+   {
+    "text": "Arc is what makes this practical, because gas is paid in USDC.",
+    "say": "Arc is what makes this practical, because gas is paid in U-S-D-C."
+   },
+   {
+    "text": "The bot spends USDC to deliver, and it's repaid in USDC from the payment, with a cap.",
+    "say": "The bot spends U-S-D-C to deliver, and it's repaid in U-S-D-C from the payment, with a cap."
+   },
+   {
+    "text": "No second token. No price oracle. No swaps.",
+    "say": "No second token. No price oracle. No swaps."
+   }
+  ]
+ },
+ {
+  "scene": "security",
+  "lines": [
+   {
+    "text": "Apart from that capped fee, money only goes two places: into the contract in the instructions, or back to the refund wallet.",
+    "say": "Apart from that capped fee, money only goes two places. Into the contract in the instructions, or back to the refund wallet."
+   },
+   {
+    "text": "Nobody can redirect a payment, and there's no admin key at all.",
+    "say": "Nobody can redirect a payment, and there's no admin key at all."
+   },
+   {
+    "text": "It isn't audited yet, so keep the amounts small.",
+    "say": "It isn't audited yet, so keep the amounts small."
+   }
+  ]
+ },
+ {
+  "scene": "uses",
+  "lines": [
+   {
+    "text": "And because it's just an address, any app can use it.",
+    "say": "And because it's just an address, any app can use it."
+   },
+   {
+    "text": "Savings. Escrow. Invoices. Payroll.",
+    "say": "Savings. Escrow. Invoices. Payroll."
+   },
+   {
+    "text": "Even AI agents: our MCP server lets them create, check and deliver payments, but never send money anywhere else.",
+    "say": "Even A-I agents. Our M-C-P server lets them create, check, and deliver payments. But never send money anywhere else."
+   }
+  ]
+ },
+ {
+  "scene": "close",
+  "lines": [
+   {
+    "text": "Your users' money is already out there.",
+    "say": "Your users' money is already out there."
+   },
+   {
+    "text": "Doorstep gives it a way in.",
+    "say": "Doorstep gives it a way in."
+   }
+  ]
+ }
+]
