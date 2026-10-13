@@ -1,0 +1,82 @@
+[
+ [
+  4.93,
+  "hook: transfer travels to the app (whoosh)"
+ ],
+ [
+  9.74,
+  "hook: arrives, nobody credited (dull thump)"
+ ],
+ [
+  37.77,
+  "intro: transfer through Doorstep (whoosh)"
+ ],
+ [
+  40.77,
+  "intro: credited (chime)"
+ ],
+ [
+  53.0,
+  "address calculated (rising blips)"
+ ],
+ [
+  55.7,
+  "instructions changed: new address (scramble)"
+ ],
+ [
+  59.57,
+  "payment sent (whoosh)"
+ ],
+ [
+  61.32,
+  "payment arrives at the address (soft thump)"
+ ],
+ [
+  66.39,
+  "delivery (whoosh)"
+ ],
+ [
+  68.04,
+  "deposit credited (chime)"
+ ],
+ [
+  69.69,
+  "return path shown (falling two notes)"
+ ],
+ [
+  85.49,
+  "real interface: delivered (chime)"
+ ],
+ [
+  108.82,
+  "payment into deposit() (whoosh)"
+ ],
+ [
+  110.42,
+  "split: vault credited (blip)"
+ ],
+ [
+  111.82,
+  "split: capped bot fee (blip)"
+ ],
+ [
+  115.7,
+  "strike-through 1"
+ ],
+ [
+  116.45,
+  "strike-through 2"
+ ],
+ [
+  117.2,
+  "strike-through 3"
+ ],
+ [
+  156.57,
+  "trail into the door (whoosh)"
+ ],
+ [
+  158.07,
+  "arrives home (chime)"
+ ]
+]
