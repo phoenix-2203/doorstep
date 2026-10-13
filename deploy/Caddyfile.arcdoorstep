@@ -1,0 +1,17 @@
+
+# ---- Doorstep: website and API on arcdoorstep.duckdns.org (appended; keep the blocks above) ----
+arcdoorstep.duckdns.org {
+	root * /var/www/arcdoorstep
+	encode gzip
+	file_server
+	# Bundles have content hashes in their names, so browsers may keep them.
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	header /*.html Cache-Control "no-cache"
+	header / Cache-Control "no-cache"
+	header /app/ Cache-Control "no-cache"
+}
+
+api.arcdoorstep.duckdns.org {
+	encode gzip
+	reverse_proxy 127.0.0.1:8797
+}
