@@ -261,7 +261,7 @@ p { margin: 0; }
       <a href="#how">How it works</a>
       <a href="#developers">Developers</a>
       <a href="#activity">Live activity</a>
-      <a class="api-link" href="https://api.104-251-218-80.sslip.io/docs">API docs</a>
+      <a class="api-link" href="https://api.arcdoorstep.duckdns.org/docs">API docs</a>
       <a href="https://github.com/phoenix-2203/doorstep">GitHub</a>
       <a class="btn" href="app/">Try the live demo</a>
     </nav>
@@ -471,7 +471,7 @@ p { margin: 0; }
           <li><b>Your contract.</b> Anything with <code>deposit(uint256 amount, address to)</code> that pulls with <code>transferFrom</code>, which includes ERC-4626 vaults. Other functions work through a custom call.</li>
         </ul>
         <div class="ctas">
-          <a class="btn" id="api-docs" href="https://api.104-251-218-80.sslip.io/docs">API reference</a>
+          <a class="btn" id="api-docs" href="https://api.arcdoorstep.duckdns.org/docs">API reference</a>
           <a class="btn secondary" href="https://github.com/phoenix-2203/doorstep/tree/main/sdk">SDK guide</a>
         </div>
       </div>
@@ -500,7 +500,7 @@ ds.toLink(invoice, { amount: <span class="s">'25'</span> });  <span class="c">//
 ds.watch(invoice, (e) => {            <span class="c">// waiting, landed, bounced</span>
   <span class="k">if</span> (e.type === <span class="s">'landed'</span>) markPaid(<span class="s">'inv-1042'</span>);
 });</pre>
-<pre id="code-api" role="tabpanel" aria-labelledby="tab-api" tabindex="0" hidden>curl -X POST <span class="s" data-api>https://api.104-251-218-80.sslip.io</span>/v1/addresses \
+<pre id="code-api" role="tabpanel" aria-labelledby="tab-api" tabindex="0" hidden>curl -X POST <span class="s" data-api>https://api.arcdoorstep.duckdns.org</span>/v1/addresses \
   -H <span class="s">"Authorization: Bearer $DOORSTEP_KEY"</span> \
   -H <span class="s">"content-type: application/json"</span> \
   -d <span class="s">'{
@@ -636,7 +636,7 @@ DOORSTEP_MAX_DAYS=90
         <p style="margin-top:14px;max-width:34ch">Payments that find their way in. Built on Arc.</p>
       </div>
       <div><h2>Product</h2><ul><li><a href="app/">Live demo</a></li><li><a href="app/#developers">Make a payment link</a></li><li><a href="#how">How it works</a></li><li><a href="#faq">Questions</a></li></ul></div>
-      <div><h2>Developers</h2><ul><li><a class="api-link" href="https://api.104-251-218-80.sslip.io/docs">API reference</a></li><li><a href="https://github.com/phoenix-2203/doorstep/tree/main/sdk">SDK</a></li><li><a href="https://www.npmjs.com/package/doorstep-arc">npm package</a></li><li><a href="https://github.com/phoenix-2203/doorstep/tree/main/keeper">Run a delivery bot</a></li><li><a href="https://github.com/phoenix-2203/doorstep">Source code</a></li></ul></div>
+      <div><h2>Developers</h2><ul><li><a class="api-link" href="https://api.arcdoorstep.duckdns.org/docs">API reference</a></li><li><a href="https://github.com/phoenix-2203/doorstep/tree/main/sdk">SDK</a></li><li><a href="https://www.npmjs.com/package/doorstep-arc">npm package</a></li><li><a href="https://github.com/phoenix-2203/doorstep/tree/main/keeper">Run a delivery bot</a></li><li><a href="https://github.com/phoenix-2203/doorstep">Source code</a></li></ul></div>
       <div><h2>Proof</h2><ul><li><a href="https://explorer.arc.io/address/0x56BD0FEfdaAF9d053a74107E6dDb9de19D306229">Contract on the explorer</a></li><li><a href="https://github.com/phoenix-2203/doorstep#mainnet-proof">Mainnet transactions</a></li><li><a href="https://github.com/phoenix-2203/doorstep#what-has-been-verified">What's been tested</a></li><li><a href="#safety">Safety and limits</a></li><li><a href="https://github.com/phoenix-2203/doorstep/blob/main/SECURITY.md">Security notes</a></li></ul></div>
     </div>
     <p class="legal">Open source under the MIT licence. Not audited: use small amounts.</p>

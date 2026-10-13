@@ -13,10 +13,11 @@ export const CONFIG = {
 
 // Public addresses of the site and API (update when the domain changes).
 export const SITE = {
-  url: 'https://phoenix-2203.github.io/doorstep/',
-  app: 'https://phoenix-2203.github.io/doorstep/app/',
-  api: 'https://api.104-251-218-80.sslip.io',
+  url: 'https://arcdoorstep.duckdns.org/',
+  app: 'https://arcdoorstep.duckdns.org/app/',
+  api: 'https://api.arcdoorstep.duckdns.org',
   repo: 'https://github.com/phoenix-2203/doorstep',
+  // The same site is mirrored on GitHub Pages: https://phoenix-2203.github.io/doorstep/
 };
 
 export const TESTNET = {
