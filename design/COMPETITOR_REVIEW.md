@@ -15,3 +15,14 @@ Pages read on 12 October 2026. "Observed" means seen on the linked page that day
 2. Every number is either from the chain (live feed, explorer links) or from a test command in the README.
 3. Safety and limitations get a full section, including "not audited".
 4. Developer path within one scroll: code tabs and API reference link.
+
+## Payment-routing products (added 13 October 2026)
+
+Read from each product's public docs on 13 October 2026. "Unconfirmed" means the docs we read didn't say.
+
+| Product | What it does well | What Doorstep can learn | What Doorstep should not copy | Opportunity for differentiation |
+| --- | --- | --- | --- | --- |
+| [Relay deposit addresses](https://docs.relay.link/features/deposit-addresses) | Clear rules for over- and underpayment, open vs strict addresses, refunds to `refundTo` | Document every wrong-amount case in a table | Sweeping into a shared depository; no contract calls ("calldata execution on the destination is not allowed") | Doorstep calls the app's contract, which Relay explicitly doesn't |
+| [Daimo Pay](https://docs.daimo.com/llms.txt) | One checkout for many chains, coins, exchanges and cards; sessions; contract calls | Exchange-friendly hosted page, prefilled amounts | Solver custody in the middle | Arc-native, open contract, refund wallet can cancel |
+| [Bridge liquidation addresses](https://apidocs.bridge.xyz/platform/orchestration/liquidation_address/liquidation_address) | A permanent address per customer that forwards to a bank or wallet | Permanent per-customer addresses are intuitive | Custody and KYC for every customer | Non-custodial; lands in smart contracts, not bank accounts |
+| [Across on Arc](https://across.to/blog/arc-on-across) | ~2 s fills into Arc from 17 chains, with destination contract calls | Contract calls as part of a transfer | Requires the payer to connect a wallet | Works from exchange withdrawals, where nobody can sign a call |
