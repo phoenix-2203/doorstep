@@ -9,7 +9,8 @@
 <link rel="icon" href="../brand/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../brand/apple-touch-icon.png">
 <link rel="preload" href="../brand/fonts/schibsted-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../brand/brand.css?v=47476824">
+<script src="../brand/theme.js?v=d60483b2"></script>
+<link rel="stylesheet" href="../brand/brand.css?v=79b1f5d1">
 <style>
 .wrap { max-width: 1200px; margin: 0 auto; padding: 40px 24px 80px; }
 @media (max-width: 560px) { .wrap { padding: 28px 16px 64px; } }
@@ -70,8 +71,8 @@ button.quiet:hover:not(:disabled) { background: transparent; border-color: var(-
 button:disabled { opacity: .45; cursor: not-allowed; }
 .menu-btn { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); }
 .menu-btn:hover:not(:disabled) { background: var(--surface); border-color: var(--ink); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) button:not(.quiet):not(.menu-btn) { background: var(--lime); border-color: var(--lime); color: #10241C; }
+@media all { /* dark theme: chosen with the switch in the header (theme.js) */
+  :root[data-theme="dark"] button:not(.quiet):not(.menu-btn) { background: var(--lime); border-color: var(--lime); color: #10241C; }
 }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
 .facts { border-top: 1px solid var(--line); margin: 0; }
@@ -101,7 +102,7 @@ section + section { margin-top: 32px; }
 .step.done .n { background: var(--ok); box-shadow: none; color: transparent; position: relative; }
 .step.done .n::before { content: ""; position: absolute; left: 11px; top: 10px; width: 10px; height: 6px; border-left: 2.5px solid #fff; border-bottom: 2.5px solid #fff; transform: rotate(-45deg); }
 .step.now .n { box-shadow: inset 0 0 0 2px var(--forest); color: var(--forest); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .step.now .n { box-shadow: inset 0 0 0 2px var(--lime); color: var(--lime); } }
+@media all { :root[data-theme="dark"] .step.now .n { box-shadow: inset 0 0 0 2px var(--lime); color: var(--lime); } }
 .step h3 { margin: 4px 0 4px; font-size: 16.5px; font-weight: 650; letter-spacing: -0.01em; }
 .step p { margin: 0 0 12px; color: var(--muted); font-size: 14.5px; }
 .big { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
@@ -131,6 +132,66 @@ pre.code { background: var(--code-bg); color: var(--code-ink); border-radius: va
 .pill { display: inline-block; font-size: 12.5px; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
 label.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; }
 label.check input { width: 20px; min-height: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--forest); flex: none; }
+/* Live demo additions */
+.compare-flow { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 20px 22px; margin-bottom: 32px; }
+.cmp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.cmp-head h2 { margin: 0; }
+.seg { display: inline-flex; padding: 3px; background: var(--surface-2); border-radius: 10px; gap: 2px; }
+.seg button { min-height: 36px; padding: 6px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-weight: 600; font-size: 14px; }
+.seg button:hover:not(:disabled) { background: transparent; color: var(--ink); }
+.seg button[aria-selected="true"], .seg button[aria-selected="true"]:hover { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 31, 25, .12); }
+:root[data-theme="dark"] .seg button[aria-selected="true"] { background: var(--forest-2) !important; color: var(--forest-ink) !important; }
+.flow-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; counter-reset: f; }
+.flow-steps li { counter-increment: f; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: var(--surface-2); font-size: 14.5px; }
+.flow-steps li::before { content: counter(f); font-weight: 700; font-size: 12px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--muted); flex: none; }
+.flow-steps li.bad, .flow-steps li.good { flex-basis: 100%; border-radius: 10px; background: transparent; padding-left: 0; font-weight: 600; }
+.flow-steps li.bad { color: var(--back); } .flow-steps li.good { color: var(--ok); }
+.flow-steps li.bad::before, .flow-steps li.good::before { content: none; }
+.flow-steps li.good { flex-basis: auto; background: color-mix(in srgb, var(--ok) 12%, transparent); padding: 8px 12px; border-radius: 999px; }
+.flow-steps li.good::before { content: counter(f); color: var(--ok); }
+details.why { border: 0; padding: 0; margin-top: 10px; }
+details.why summary { font-weight: 600; font-size: 14px; color: var(--link); padding: 4px 0; justify-content: flex-start; gap: 8px; }
+details.why summary::after { width: 7px; height: 7px; border-color: var(--link); }
+details.why[open] { padding-bottom: 4px; }
+details.why p, details.why ol { font-size: 14.5px; color: var(--muted); margin: 6px 0 8px; }
+details.why .facts { margin: 6px 0; } details.why .facts div { grid-template-columns: 170px minmax(0, 1fr); padding: 7px 0; font-size: 14px; }
+.howto { padding-left: 20px; } .howto li { margin: 4px 0; }
+.amount-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 8px; }
+.amount-input { display: flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); padding-right: 12px; max-width: 200px; }
+.amount-input:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.amount-input input { border: 0; min-height: 44px; font-size: 18px; font-weight: 650; width: 120px; outline: none; background: transparent; }
+.amount-input span { color: var(--muted); font-size: 14px; font-weight: 600; }
+.chips { display: flex; gap: 6px; }
+.chip-btn { min-height: 36px; padding: 4px 12px; border-radius: 999px; background: var(--surface-2); color: var(--ink); border: 1px solid transparent; font-size: 14px; }
+.chip-btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line-strong); }
+.chip-btn[aria-pressed="true"] { border-color: var(--forest); }
+.hint.warn { color: var(--wait); font-weight: 600; }
+.tracker { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+.tracker li { position: relative; padding-top: 22px; font-size: 13.5px; color: var(--muted); text-align: center; }
+.tracker li::before { content: ""; position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--line-strong); background: var(--surface); z-index: 1; }
+.tracker li::after { content: ""; position: absolute; top: 8px; left: -50%; width: 100%; height: 2px; background: var(--line); }
+.tracker li:first-child::after { display: none; }
+.tracker li.done { color: var(--ink); font-weight: 600; }
+.tracker li.done::before { background: var(--ok); box-shadow: none; }
+.tracker li.done::after, .tracker li.now::after { background: var(--ok); }
+.tracker li.now { color: var(--ink); font-weight: 650; }
+.tracker li.now::before { box-shadow: inset 0 0 0 3px var(--wait); }
+.balance { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.balance .k { color: var(--muted); font-size: 14px; }
+.activity-box { margin-top: 40px; }
+.receipts { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.receipts > li { border-bottom: 1px solid var(--line); }
+.receipts > li.empty { padding: 16px 0; color: var(--muted); font-size: 15px; }
+.receipts details { border: 0; padding: 0; }
+.receipts summary { padding: 14px 0; display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto 12px; gap: 12px; align-items: center; font-weight: 500; }
+.receipts summary b { font-size: 17px; }
+.receipts summary .when { color: var(--muted); font-size: 14px; }
+.receipts .rcpt { margin: 0 0 14px; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; z-index: 50; background: var(--forest); color: var(--forest-ink); padding: 12px 18px; border-radius: 12px; font-weight: 600; box-shadow: 0 16px 40px -16px rgba(0,0,0,.45); transition: opacity .24s, transform .24s; max-width: calc(100vw - 32px); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--lime); margin-right: 10px; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+@media (max-width: 560px) { details.why .facts div { grid-template-columns: 1fr; } .tracker li { font-size: 12.5px; } }
 footer.app-foot { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
 </style>
 </head>
@@ -142,7 +203,6 @@ footer.app-foot { margin-top: 64px; padding-top: 20px; border-top: 1px solid var
       <svg class="tile" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#153E31"/><path d="M17 49V27a15.5 15.5 0 0 1 31 0v22" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round"/><path d="M6.5 36H31M25 30l6 6-6 6" fill="none" stroke="#B9F27C" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="42.6" cy="45" r="3.6" fill="#B9F27C"/></svg>
       <span class="word">doorstep</span>
     </a>
-    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" id="menu-btn">Menu</button>
     <nav class="site-nav" id="site-nav" aria-label="Main">
       <a href="./" id="nav-home">Live demo</a>
       <a href="#developers" id="nav-dev">Developers</a>
@@ -150,6 +210,10 @@ footer.app-foot { margin-top: 64px; padding-top: 20px; border-top: 1px solid var
       <a href="https://github.com/phoenix-2203/doorstep" target="_blank" rel="noopener">GitHub</a>
       <span class="net-badge" id="net">Arc</span>
     </nav>
+    <div class="head-tools">
+      <button class="theme-btn" type="button" id="theme-btn" aria-pressed="false" aria-label="Switch to dark mode"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-nav" id="menu-btn">Menu</button>
+    </div>
   </div>
 </header>
 
@@ -158,8 +222,32 @@ footer.app-foot { margin-top: 64px; padding-top: 20px; border-top: 1px solid var
   <div id="home-view" hidden>
     <div class="page-head">
       <h1 class="lede">Try Doorstep with real USDC.</h1>
-      <p class="sub">The demo savings vault only accepts deposits through its own function, so a wallet can't send to it directly. Doorstep gives you an address that can. It takes about a minute and a few cents.</p>
+      <p class="sub">Pretend you run a savings app on Arc. Your customers keep their USDC on exchanges like Kraken or KuCoin. This demo shows how they can save straight from there, with no wallet setup and no app to connect.</p>
     </div>
+
+    <section class="compare-flow" aria-labelledby="cmp-title">
+      <div class="cmp-head">
+        <h2 id="cmp-title">Why it matters</h2>
+        <div class="seg" role="tablist" aria-label="Compare">
+          <button type="button" role="tab" id="cmp-without" aria-selected="false" aria-controls="cmp-panel">Without Doorstep</button>
+          <button type="button" role="tab" id="cmp-with" aria-selected="true" aria-controls="cmp-panel">With Doorstep</button>
+        </div>
+      </div>
+      <div id="cmp-panel" role="tabpanel" aria-live="polite">
+        <ol class="flow-steps" id="flow-without" hidden>
+          <li>Withdraw USDC from the exchange to a personal wallet</li>
+          <li>Add the Arc network to that wallet</li>
+          <li>Open the savings app and connect the wallet</li>
+          <li>Approve the vault to take USDC</li>
+          <li>Press Deposit and confirm again</li>
+          <li class="bad">Six steps, two wallet confirmations, and a wallet the customer may not have</li>
+        </ol>
+        <ol class="flow-steps" id="flow-with">
+          <li>The app shows the customer their savings address once</li>
+          <li class="good">They withdraw from the exchange straight to it. It's in their savings a few seconds later</li>
+        </ol>
+      </div>
+    </section>
 
     <div class="stage">
       <div class="door" id="door-home" data-state="idle" aria-live="polite">
@@ -171,36 +259,82 @@ footer.app-foot { margin-top: 64px; padding-top: 20px; border-top: 1px solid var
       </div>
       <section class="card" aria-labelledby="try-title">
         <h2 id="try-title">Your savings address</h2>
-        <p class="demo-note">This is Arc mainnet, so it uses real USDC. Try a small amount; you can withdraw it at the end.</p>
+        <p class="demo-note">This is Arc mainnet, so it uses real USDC. Start with a few cents; you can withdraw everything at the end.</p>
 
         <div class="step" id="s1">
           <div class="n">1</div>
           <div><h3>Connect your wallet</h3><p>This is the account your savings belong to.</p>
             <div class="actions"><button type="button" id="btn-connect">Connect wallet</button></div>
+            <details class="why"><summary>Why connect a wallet?</summary><p>Only so the demo knows whose savings these are, and so you can withdraw later. In a real app this would be your account in the app. The payments themselves can come from anywhere: another wallet, an exchange, a friend.</p></details>
             <p class="msg" id="s1-msg" role="status"></p></div>
         </div>
         <div class="step" id="s2">
           <div class="n">2</div>
-          <div><h3>Get your savings address</h3><p>One confirmation in your wallet, under $0.01. It registers your address so payments are delivered automatically. You only do this once: it's the same address every time.</p>
+          <div><h3>Get your savings address</h3><p>One confirmation in your wallet, under $0.01. You only do this once: it's the same address every time.</p>
             <div class="actions"><button type="button" id="btn-create" disabled>Get my address</button></div>
+            <details class="why"><summary>What is this address?</summary>
+              <p>It's calculated from a set of instructions, so it can't be changed or redirected. Yours says:</p>
+              <dl class="facts" id="home-instr"><div><dt>Deposit into</dt><dd>The demo savings vault</dd></div><div><dt>Credit</dt><dd>Your wallet</dd></div><div><dt>If it can't be delivered</dt><dd>Back to your wallet</dd></div><div><dt>Smallest delivery</dt><dd>0.01 USDC; less waits for more</dd></div><div><dt>Delivery fee limit</dt><dd>0.01 USDC, taken from the payment</dd></div><div><dt>Accepts until</dt><dd>31 December 2027</dd></div></dl>
+              <p>Registering publishes these instructions on Arc so delivery bots know to watch your address.</p>
+            </details>
             <p class="msg" id="s2-msg" role="status"></p></div>
         </div>
         <div class="step" id="s3">
           <div class="n">3</div>
-          <div><h3>Send USDC to it from anywhere</h3><p>Any amount from 0.01 USDC, from any wallet or an exchange withdrawal on the Arc network. Or send from this wallet with the button.</p>
-            <div class="actions"><button type="button" id="btn-home-pay" disabled>Send from this wallet</button><button type="button" class="quiet" id="btn-home-copy" disabled>Copy address</button></div>
+          <div><h3>Send USDC to it</h3><p>Use this wallet, or any wallet or exchange that sends USDC on the Arc network.</p>
+            <div class="amount-row">
+              <label for="home-amount" class="sr-only">Amount in USDC</label>
+              <div class="amount-input"><input id="home-amount" type="number" inputmode="decimal" min="0" step="0.01" value="0.05" disabled><span>USDC</span></div>
+              <div class="chips" role="group" aria-label="Quick amounts"><button type="button" class="chip-btn" data-amt="0.05" disabled>0.05</button><button type="button" class="chip-btn" data-amt="0.25" disabled>0.25</button><button type="button" class="chip-btn" data-amt="1" disabled>1</button></div>
+            </div>
+            <p class="hint" id="amount-hint">0.01 USDC or more is delivered. Less waits at the address until more arrives, or until you take it back.</p>
+            <div class="actions"><button type="button" id="btn-home-pay" disabled>Send 0.05 USDC</button><button type="button" class="quiet" id="btn-home-copy" disabled>Copy address</button></div>
+            <details class="why"><summary>Send from an exchange instead</summary>
+              <ol class="howto"><li>In Kraken, KuCoin or another exchange that supports Arc, choose <b>Withdraw USDC</b>.</li><li>Pick <b>Arc</b> as the network. Not Ethereum, Base or any other.</li><li>Paste your savings address, or scan the QR code.</li><li>Send. It's delivered into your savings seconds after it arrives.</li></ol>
+              <p>Only USDC on Arc can be delivered. Other tokens sent to this address can't be recovered.</p>
+            </details>
             <p class="msg" id="s3-msg" role="status"></p></div>
         </div>
         <div class="step" id="s4">
           <div class="n">4</div>
           <div><h3>Watch it arrive in your savings</h3>
+            <ol class="tracker" id="tracker" aria-label="Payment progress">
+              <li id="tr-sent">Sent</li>
+              <li id="tr-arrived">At your address</li>
+              <li id="tr-saved">In your savings</li>
+            </ol>
             <p id="s4-status">Your balance in the vault updates here within seconds of each payment.</p>
-            <div class="big" id="home-balance">–</div>
-            <div class="actions" style="margin-top:12px"><button type="button" id="btn-home-deliver" hidden>Deliver it now</button><button type="button" class="quiet" id="btn-home-withdraw" disabled>Withdraw to my wallet</button></div>
+            <div class="balance"><span class="k">Savings balance</span><span class="big" id="home-balance">–</span></div>
+            <div class="actions" style="margin-top:12px">
+              <button type="button" id="btn-home-deliver" hidden>Deliver it now</button>
+              <button type="button" class="quiet" id="btn-home-cancel" hidden>Take back what's waiting</button>
+              <button type="button" class="quiet" id="btn-notify">Notify me when it lands</button>
+            </div>
+            <details class="why"><summary>What if something goes wrong?</summary>
+              <p><b>Under the minimum:</b> it waits at your address. Press <b>Take back what's waiting</b> to get every cent back at once, with no fee. Otherwise it stays until more arrives, or is returned after the address's deadline.</p>
+              <p><b>Delivery bot offline:</b> after 15 seconds a <b>Deliver it now</b> button appears. Your wallet pays the network fee and gets it straight back from the payment.</p>
+              <p><b>The vault refuses it:</b> the money goes straight back to your wallet.</p>
+            </details>
             <p class="msg" id="s4-msg" role="status"></p></div>
+        </div>
+        <div class="step" id="s5">
+          <div class="n">5</div>
+          <div><h3>Withdraw whenever you like</h3><p>The money is in the vault under your name. Take some or all of it back to your wallet.</p>
+            <div class="amount-row">
+              <label for="home-wd-amount" class="sr-only">Amount to withdraw in USDC</label>
+              <div class="amount-input"><input id="home-wd-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="All" disabled><span>USDC</span></div>
+              <button type="button" class="quiet" id="btn-home-withdraw" disabled>Withdraw to my wallet</button>
+            </div>
+            <p class="msg" id="s5-msg" role="status"></p></div>
         </div>
       </section>
     </div>
+
+    <section class="activity-box" aria-labelledby="act-title">
+      <h2 id="act-title">Your payments</h2>
+      <p class="intro">Every delivery and return for your savings address, read from Arc. Each has a receipt.</p>
+      <ul class="receipts" id="home-activity"><li class="empty">Nothing yet. Payments appear here after they're delivered.</li></ul>
+    </section>
   </div>
 
   <!-- ============================== Developers ============================== -->
@@ -361,6 +495,7 @@ ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
 
   <footer class="app-foot">Doorstep is new and not audited. Use small amounts. <a href="https://github.com/phoenix-2203/doorstep">Source, tests and mainnet proof</a>.</footer>
 </main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
   // Header menu on small screens. The payment logic lives in app.js.
   (function () {
@@ -373,6 +508,6 @@ ds.watch(intent, (e) =&gt; console.log(e.type)); // waiting, landed, bounced
     addEventListener('scroll', function () { h.classList.toggle('scrolled', scrollY > 8); }, { passive: true });
   })();
 </script>
-<script type="module" src="../assets/app-ITA5S2L2.js"></script>
+<script type="module" src="../assets/app-PB3LLAG6.js"></script>
 </body>
 </html>
