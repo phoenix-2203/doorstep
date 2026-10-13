@@ -333,7 +333,7 @@ const fromB64 = (s) => atob(s.replace(/-/g, '+').replace(/_/g, '/'));
  * then shows "Pay 25 USDC" and tracks underpayment. It doesn't change the address (it isn't part of
  * the instructions); use `minimum` in the intent so nothing is delivered before it's all there.
  */
-export function toLink(intent, { baseUrl = 'https://phoenix-2203.github.io/doorstep/app/', fromBlock = 0n, doorstep, chainId, amount } = {}) {
+export function toLink(intent, { baseUrl = 'https://arcdoorstep.duckdns.org/app/', fromBlock = 0n, doorstep, chainId, amount } = {}) {
   const payload = toB64(JSON.stringify({
     ...intent,
     amountOffset: Number(intent.amountOffset),

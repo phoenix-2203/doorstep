@@ -106,7 +106,7 @@ test('describe handles unknown functions', () => {
 test('links round-trip, with and without overrides', () => {
   const i = depositIntent({ into: T, beneficiary: A, refundTo: R, minimum: '1', expires: 1900000000, reference: 'x' });
   const link = toLink(i, { fromBlock: 123n });
-  assert.ok(link.startsWith('https://phoenix-2203.github.io/doorstep/app/#i='));
+  assert.ok(link.startsWith('https://arcdoorstep.duckdns.org/app/#i='));
   const back = parseLink(link);
   assert.deepEqual(back.intent, i);
   assert.equal(back.fromBlock, 123n);

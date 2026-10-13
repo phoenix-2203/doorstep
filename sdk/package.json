@@ -1,6 +1,6 @@
 {
   "name": "doorstep-arc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deposit addresses that fund any Arc contract on arrival: build, explain, watch, land and cancel Doorstep intents.",
   "type": "module",
   "main": "./src/index.js",
