@@ -46,8 +46,8 @@
   --r-lg: 20px;
   --ease: cubic-bezier(.2, .7, .2, 1);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+@media all { /* dark theme: chosen with the switch in the header (theme.js) */
+  :root[data-theme="dark"] {
     color-scheme: dark;
     --bg: #0F1613;
     --surface: #16201B;
@@ -89,7 +89,7 @@ code { font-size: .9em; }
 .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
 .logo svg.tile { width: 32px; height: 32px; flex: none; }
 .logo .word { font: 700 23px/1 var(--sans); letter-spacing: -0.02em; color: var(--forest); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo .word { color: var(--ink); } }
+@media all { :root[data-theme="dark"] .logo .word { color: var(--ink); } }
 
 /* ------------------------------------------------------------------ buttons */
 .btn {
@@ -107,9 +107,9 @@ code { font-size: .9em; }
 .btn.lime { background: var(--lime); border-color: var(--lime); color: #10241C; }
 .btn.lime:hover { background: #CBF79A; border-color: #CBF79A; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .btn:not(.secondary):not(.lime) { background: var(--lime); border-color: var(--lime); color: #10241C; }
-  :root:not([data-theme="light"]) .btn:not(.secondary):not(.lime):hover { background: #CBF79A; border-color: #CBF79A; }
+@media all {
+  :root[data-theme="dark"] .btn:not(.secondary):not(.lime) { background: var(--lime); border-color: var(--lime); color: #10241C; }
+  :root[data-theme="dark"] .btn:not(.secondary):not(.lime):hover { background: #CBF79A; border-color: #CBF79A; }
 }
 
 /* ------------------------------------------------------------------ status chips */
@@ -129,7 +129,7 @@ code { font-size: .9em; }
 .site-header { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid transparent; transition: border-color .2s; }
 .site-header.scrolled { border-bottom-color: var(--line); }
 .site-header .bar { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.site-nav { display: flex; align-items: center; gap: 4px; }
+.site-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .site-nav a:not(.btn) { color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 500; padding: 8px 12px; border-radius: 8px; }
 .site-nav a:not(.btn):hover, .site-nav a[aria-current="page"] { color: var(--ink); background: var(--surface-2); }
 .site-nav .btn { margin-left: 10px; min-height: 40px; padding: 8px 16px; }
@@ -152,3 +152,12 @@ code { font-size: .9em; }
 .site-footer a { color: var(--muted); text-decoration: none; }
 .site-footer a:hover { color: var(--ink); text-decoration: underline; }
 .site-footer .legal { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 14px; }
+
+/* ------------------------------------------------------------------ theme switch */
+.theme-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; min-height: 40px; padding: 0; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
+.theme-btn:hover { border-color: var(--ink); }
+.theme-btn svg { width: 18px; height: 18px; }
+.theme-btn .moon { display: none; }
+:root[data-theme="dark"] .theme-btn .sun { display: none; }
+:root[data-theme="dark"] .theme-btn .moon { display: block; }
+.head-tools { display: flex; align-items: center; gap: 8px; }
