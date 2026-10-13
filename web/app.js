@@ -297,6 +297,7 @@ async function initHome() {
     amountInput.disabled = false;
     for (const c of document.querySelectorAll('.chip-btn')) c.disabled = false;
     $('home-light').textContent = 'Ready for payments';
+    refresh().catch(() => {}); // take a first reading now, so the next payment shows up as a change
   }
 
   $('btn-connect').onclick = async () => {
@@ -326,6 +327,7 @@ async function initHome() {
       say('s3-msg', `Sent ${esc(amount)} USDC. ${link('tx/' + tx, 'View transaction')}`);
       track('done', 'now', '');
       mark(3, 'done'); mark(4, 'now');
+      fastUntil = Date.now() + 90_000; // watch closely for a minute and a half
       $('s4-status').textContent = 'Waiting for your payment to arrive at your address…';
     } catch (e) { say('s3-msg', esc(errText(e)), true); }
   };
@@ -460,12 +462,14 @@ async function initHome() {
   }
 
   let looping = false;
+  // Right after a send, check every 2.5 s (two light reads), then fall back to the normal pace.
+  let fastUntil = 0;
   function loop() {
     if (looping) return;
     looping = true;
     const tick = async () => {
-      try { await refresh(); say('s4-msg', ''); } catch (e) { say('s4-msg', isBusy(e) ? BUSY_TEXT : `Couldn't reach Arc: ${esc(errText(e))}`, !isBusy(e)); }
-      setTimeout(tick, POLL_MS);
+      try { await refresh(); if (/busy|reach Arc/.test($('s4-msg').textContent)) say('s4-msg', ''); } catch (e) { say('s4-msg', isBusy(e) ? BUSY_TEXT : `Couldn't reach Arc: ${esc(errText(e))}`, !isBusy(e)); }
+      setTimeout(tick, Date.now() < fastUntil ? 2500 : POLL_MS);
     };
     tick();
   }
@@ -562,6 +566,7 @@ async function initPay(fragment) {
   const ds = clientFor(doorAddr, fromBlock);
   const cancellable = !isLegacy(doorAddr);
   const dep = ds.depositAddress(intent);
+  let seenEvents = null; // how many events the page has shown, to notice new ones
   const ex = explain(intent);
   const isEscrow = intent.target === ESCROW;
   const targetName = isEscrow ? 'the demo savings vault' : short(intent.target);
@@ -670,6 +675,11 @@ async function initPay(fragment) {
     }
     $('timeline').innerHTML = steps.map(([c, t, small]) => `<li class="${c}">${t}${small ? `<small>${small}</small>` : ''}</li>`).join('');
 
+    if (seenEvents !== null && events.length > seenEvents) {
+      const e = events[events.length - 1];
+      notify(e.event === 'Landed' ? `${usd(formatUsdc6(e.amountPulled6))} USDC delivered` : `${usd(formatUsdc18(e.refunded))} USDC returned`);
+    }
+    seenEvents = events.length;
     $('log').innerHTML = events.length
       ? [...events].reverse().map((e) => (e.event === 'Landed'
         ? `<li><span class="ok">Delivered</span> ${formatUsdc6(e.amountPulled6)} USDC into ${short(e.target)}. Network fee ${formatUsdc18(e.keeperFee)} USDC${e.refunded > 0n ? `, ${formatUsdc18(e.refunded)} returned` : ''}. ${link('tx/' + e.transactionHash, 'View transaction')}</li>`
@@ -687,14 +697,17 @@ async function initPay(fragment) {
   $('btn-pay').onclick = run(async () => {
     const st = await ds.status(intent);
     const suggested = amount6 !== undefined ? paymentState(amount6, { received: st.waitingRaw }).remaining : ex.minimum !== '0' ? ex.minimum : '0.1';
-    const amount = prompt('How much USDC to send?', suggested !== '0' ? suggested : '0.1');
-    if (!amount) return;
+    const amount = $('pay-amount').value.trim() || (suggested !== '0' ? suggested : '');
+    if (!amount || !(Number(amount) > 0)) throw new Error('Enter how much USDC to send.');
     const w = await connect(ds);
     // A plain native transfer: exactly what a wallet's Send button does.
     const tx = await w.sendTransaction({ to: dep, value: parseUnits(amount, 18) });
     say('pay-msg', `Sent. ${link('tx/' + tx, 'View transaction')}`);
   });
   $('btn-copy').onclick = run(async () => { await navigator.clipboard.writeText(location.href); say('pay-msg', 'Link copied.'); });
+  setupNotifyButton('btn-notify-pay');
+  // Suggest what's still owed (invoices) or the minimum, without a network call.
+  $('pay-amount').value = amount6 !== undefined ? formatUsdc6(amount6) : ex.minimum !== '0' ? ex.minimum : '0.05';
   $('btn-deliver-main').onclick = () => $('btn-land').click();
   $('btn-land').onclick = run(async () => {
     const w = await connect(ds);
